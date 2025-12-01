@@ -23,7 +23,7 @@ export default function Contact() {
           <h1 className="text-4xl md:text-6xl font-serif mb-4">
             Get in <span className="text-[#D4AF37]">Touch</span>
           </h1>
-          <p className="text-white/80 max-w-xl mx-auto text-lg">We'd love to hear from you. Send us a message and we'll respond as soon as possible.</p>
+          <p className="text-white/80 max-w-xl mx-auto text-lg">We&apos;d love to hear from you. Send us a message and we&apos;ll respond as soon as possible.</p>
         </div>
       </section>
 

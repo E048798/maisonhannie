@@ -75,7 +75,7 @@ export default function Catering() {
                 <span className="text-[#D4AF37]">Next Event</span>
               </h2>
               <p className="text-black/70 mb-8 leading-relaxed">
-                Whether it's an intimate brunch or a grand celebration, our team will work with you to create a memorable culinary experience.
+                Whether it&apos;s an intimate brunch or a grand celebration, our team will work with you to create a memorable culinary experience.
               </p>
 
               <div className="space-y-4">
@@ -105,7 +105,7 @@ export default function Catering() {
             {testimonials.map((testimonial) => (
               <div key={testimonial.id} className="bg-[#F7F3EC] rounded-2xl p-8 relative">
                 <Quote className="w-10 h-10 text-[#D4AF37]/20 absolute top-6 right-6" />
-                <p className="text-black/80 leading-relaxed mb-6 relative z-10">"{testimonial.quote}"</p>
+                <p className="text-black/80 leading-relaxed mb-6 relative z-10">&quot;{testimonial.quote}&quot;</p>
                 <div className="flex items-center gap-4">
                   <img src={testimonial.image} alt={testimonial.name} className="w-12 h-12 rounded-full object-cover" />
                   <div>

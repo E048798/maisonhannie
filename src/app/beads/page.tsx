@@ -37,7 +37,7 @@ export default function BeadWorks() {
               <span className="text-sm text-black font-medium">Featured Collection</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-serif text-black mb-4">Best Selling Jewelry</h2>
-            <p className="text-black/70 max-w-xl mx-auto">Our customers' favorites, perfect for any occasion</p>
+            <p className="text-black/70 max-w-xl mx-auto">Our customers&apos; favorites, perfect for any occasion</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">

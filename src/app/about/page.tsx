@@ -85,7 +85,7 @@ export default function About() {
           </div>
 
           <h2 className="text-3xl md:text-5xl font-serif text-black mb-6 max-w-3xl mx-auto">
-            "To bring <span className="text-[#D4AF37]">handcrafted beauty</span> into everyday moments"
+            &quot;To bring <span className="text-[#D4AF37]">handcrafted beauty</span> into everyday moments&quot;
           </h2>
 
           <p className="text-black/70 max-w-2xl mx-auto text-lg leading-relaxed">

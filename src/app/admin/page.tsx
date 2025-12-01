@@ -457,7 +457,7 @@ export default function Admin() {
                         <strong>Subject:</strong> How was your purchase from Maison Hannie?
                       </p>
                       <p className="text-sm text-black/70 mt-2">
-                        <strong>Preview:</strong> "Thank you for your recent purchase! We'd love to hear your feedback..."
+                        <strong>Preview:</strong> &quot;Thank you for your recent purchase! We&apos;d love to hear your feedback...&quot;
                       </p>
                     </div>
                   </div>
