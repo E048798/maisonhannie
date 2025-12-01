@@ -1,23 +1,31 @@
 "use client";
-import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+export const dynamic = 'force-dynamic';
 
 export default function PaystackCallback() {
-  const params = useSearchParams();
-  const status = params.get("status");
-  const reference = params.get("reference");
+  const [status, setStatus] = useState<string | null>(null);
+  const [reference, setReference] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.parent?.postMessage({ type: "paystack-callback", status, reference }, window.origin);
-    }
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      setStatus(sp.get("status"));
+      setReference(sp.get("reference"));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!reference) return;
+    window.parent?.postMessage({ type: "paystack-callback", status, reference }, window.origin);
   }, [status, reference]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F3EC]">
-      <div className="bg-white rounded-2xl p-8 text-center">
-        <p className="text-black/70">Processing payment...</p>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#F7F3EC]"><div className="bg-white rounded-2xl p-8 text-center"><p className="text-black/70">Processing payment...</p></div></div>}>
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F3EC]">
+        <div className="bg-white rounded-2xl p-8 text-center">
+          <p className="text-black/70">Processing payment...</p>
+        </div>
       </div>
-    </div>
+    </Suspense>
   );
 }
