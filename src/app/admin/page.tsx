@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,22 +33,30 @@ export default function Admin() {
   }, []);
 
   async function checkAuth() {
-    const authenticated = await base44.auth.isAuthenticated();
-    if (authenticated) {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    if (session?.user) {
+      setUser({ email: session.user.email || undefined, full_name: session.user.user_metadata?.full_name });
       setIsAuthenticated(true);
     }
     setIsLoading(false);
   }
 
-  function handleLogin() {
-    base44.auth.redirectToLogin(window.location.href);
-    checkAuth();
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginSent, setLoginSent] = useState(false);
+
+  async function handleLogin(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!loginEmail) return;
+    setLoginLoading(true);
+    await supabase.auth.signInWithOtp({ email: loginEmail, options: { shouldCreateUser: true } });
+    setLoginSent(true);
+    setLoginLoading(false);
   }
 
-  function handleLogout() {
-    base44.auth.logout();
+  async function handleLogout() {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
   }
 
@@ -173,10 +182,16 @@ export default function Admin() {
         <Card className="max-w-md w-full mx-4">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-serif">Admin Login</CardTitle>
-            <p className="text-black/60 mt-2">Sign in to access the admin panel</p>
+            <p className="text-black/60 mt-2">Sign in via magic link</p>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleLogin} className="w-full bg-[#D4AF37] hover:bg-[#C4A030] text-white">Sign In</Button>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <Input type="email" placeholder="admin@email.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
+              <Button type="submit" disabled={loginLoading} className="w-full bg-[#D4AF37] hover:bg-[#C4A030] text-white">
+                {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Magic Link'}
+              </Button>
+            </form>
+            {loginSent && <p className="text-xs text-black/50 mt-3">Check your email for the login link</p>}
           </CardContent>
         </Card>
       </div>
