@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Basic resets */
+html, body, #__next { height: 100%; }
+body { color: #000; background: #F7F3EC; }
+
+:root {
+  --color-primary: #D4AF37;
+  --color-secondary: #E5DCC5;
+  --color-background: #F7F3EC;
+  --color-text: #000000;
+}
+
+/* Fonts */
+body { font-family: 'Inter', system-ui, sans-serif; }
+.font-serif { font-family: 'Playfair Display', Georgia, serif; }
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer { animation: shimmer 2s infinite linear; }
