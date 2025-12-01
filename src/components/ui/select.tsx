@@ -56,6 +56,7 @@ export function SelectItem({ value, children }: { value: string; children: React
   return (
     <div
       role="option"
+      aria-selected={ctx.value === value}
       className="px-3 py-2 cursor-pointer hover:bg-black/5"
       onClick={() => {
         ctx.setValue(value);

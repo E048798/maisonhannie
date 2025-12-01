@@ -22,7 +22,7 @@ export default function BookingForm() {
           <CheckCircle className="w-10 h-10 text-green-600" />
         </div>
         <h3 className="text-2xl font-serif text-black mb-4">Inquiry Submitted!</h3>
-        <p className="text-black/70 mb-6">Thank you for your interest. We'll get back to you within 24 hours to discuss your event.</p>
+        <p className="text-black/70 mb-6">Thank you for your interest. We&apos;ll get back to you within 24 hours to discuss your event.</p>
         <Button onClick={() => setSubmitted(false)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white rounded-full">Submit Another Inquiry</Button>
       </div>
     );
@@ -31,7 +31,7 @@ export default function BookingForm() {
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 md:p-12 shadow-xl">
       <h3 className="text-2xl font-serif text-black mb-2">Book Your Event</h3>
-      <p className="text-black/60 mb-8">Fill out the form and we'll contact you soon</p>
+      <p className="text-black/60 mb-8">Fill out the form and we&apos;ll contact you soon</p>
 
       <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-2">

@@ -33,7 +33,7 @@ export default function Home() {
               >
                 <Quote className="w-10 h-10 text-[#D4AF37]/20 absolute top-6 right-6" />
                 <p className="text-black/80 leading-relaxed mb-6 relative z-10">
-                  "{testimonial.quote}"
+                  &quot;{testimonial.quote}&quot;
                 </p>
                 <div className="flex items-center gap-4">
                   <img

@@ -111,7 +111,7 @@ export default function Contact() {
                   <CheckCircle className="w-10 h-10 text-green-600" />
                 </div>
                 <h3 className="text-2xl font-serif text-black mb-4">Message Sent!</h3>
-                <p className="text-black/70 mb-6 max-w-md">Thank you for reaching out. We've received your message and will get back to you within 24 hours.</p>
+                <p className="text-black/70 mb-6 max-w-md">Thank you for reaching out. We&apos;ve received your message and will get back to you within 24 hours.</p>
                 <Button
                   onClick={() => {
                     setSubmitted(false);
@@ -125,7 +125,7 @@ export default function Contact() {
             ) : (
               <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 md:p-12 shadow-sm">
                 <h3 className="text-2xl font-serif text-black mb-2">Send a Message</h3>
-                <p className="text-black/60 mb-8">We'll get back to you as soon as possible</p>
+                <p className="text-black/60 mb-8">We&apos;ll get back to you as soon as possible</p>
 
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
