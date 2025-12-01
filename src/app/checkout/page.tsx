@@ -2,16 +2,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/components/cart/CartContext";
-// base44 integration is temporarily disabled for client-side only demo
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ShoppingBag, MapPin, User, Phone, Copy, CheckCircle, ArrowRight, CreditCard, Loader2 } from "lucide-react";
 import { generateTrackingCode } from "@/lib/entities/order";
-
-// Using server-side initialization via API route
-
 const NIGERIAN_STATES = [
   "Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno",
   "Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","FCT","Gombe","Imo",
