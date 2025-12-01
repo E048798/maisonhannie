@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/components/cart/CartContext";
-import { base44 } from "@/api/base44Client";
+// base44 integration is temporarily disabled for client-side only demo
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ShoppingBag, MapPin, User, Phone, Copy, CheckCircle, ArrowRight, CreditCard, Loader2 } from "lucide-react";
 import { generateTrackingCode } from "@/lib/entities/order";
 
-const PAYSTACK_PUBLIC_KEY = "pk_test_e1ed952e7ba69b6897bc7c67a3c8587c68195cd0";
+// Using server-side initialization via API route
 
 const NIGERIAN_STATES = [
   "Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno",
@@ -28,63 +28,47 @@ export default function Checkout() {
   const [orderComplete, setOrderComplete] = useState(false);
   const [trackingCode, setTrackingCode] = useState("");
   const [copied, setCopied] = useState(false);
-  const [paystackLoaded, setPaystackLoaded] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [transaction, setTransaction] = useState<any | null>(null);
   const [email, setEmail] = useState("");
   const [formData, setFormData] = useState({ name: "", phone: "", address: "", landmark: "", city: "", state: "" });
 
   useEffect(() => {
-    if ((window as any).PaystackPop) { setPaystackLoaded(true); return; }
-    const existing = document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]');
-    if (existing) { setPaystackLoaded(true); return; }
-    const script = document.createElement("script");
-    script.src = "https://js.paystack.co/v1/inline.js";
-    script.async = true;
-    script.onload = () => setPaystackLoaded(true);
-    script.onerror = () => {};
-    document.head.appendChild(script);
-  }, []);
+    function onMessage(e: MessageEvent) {
+      if (!e.data || e.data.type !== "paystack-callback") return;
+      setShowPaymentModal(false);
+      const { status, reference } = e.data;
+      if (!reference) { setIsSubmitting(false); return; }
+      fetch(`/api/paystack/verify?reference=${reference}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setTransaction(data?.data || null);
+          setTrackingCode(reference);
+          setOrderComplete(true);
+          clearCart();
+          setIsSubmitting(false);
+        })
+        .catch(() => setIsSubmitting(false));
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [clearCart]);
 
   async function handlePayment(e: React.FormEvent) {
     e.preventDefault();
-    const Pop = (window as any).PaystackPop;
-    if (!paystackLoaded || !Pop) return alert("Payment system is loading, please try again.");
     setIsSubmitting(true);
-    const handler = Pop.setup({
-      key: PAYSTACK_PUBLIC_KEY,
-      email,
-      amount: Math.round(cartTotal * 100),
-      currency: "NGN",
-      ref: generateTrackingCode(),
-      metadata: { customer_name: formData.name, phone: formData.phone, custom_fields: [
-        { display_name: "Customer Name", variable_name: "customer_name", value: formData.name },
-        { display_name: "Phone", variable_name: "phone", value: formData.phone },
-      ] },
-      callback: async (response: any) => {
-        const code = response.reference;
-        await base44.entities.Order.create({
-          tracking_code: code,
-          customer_name: formData.name,
-          phone: formData.phone,
-          address: formData.address,
-          landmark: formData.landmark,
-          city: formData.city,
-          state: formData.state,
-          items: cart.map((item) => ({ id: item.id, name: item.name, price: item.price, quantity: item.quantity, image: item.image })),
-          total: cartTotal,
-          status: "confirmed",
-          status_history: [
-            { status: "pending", timestamp: new Date().toISOString(), note: "Order placed" },
-            { status: "confirmed", timestamp: new Date().toISOString(), note: "Payment confirmed via Paystack" },
-          ],
-        } as any);
-        setTrackingCode(code);
-        setOrderComplete(true);
-        clearCart();
-        setIsSubmitting(false);
-      },
-      onClose: () => { setIsSubmitting(false); },
+    const reference = generateTrackingCode();
+    const metadata = { customer_name: formData.name, phone: formData.phone, items: cart };
+    const res = await fetch('/api/paystack/initialize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, amount: Math.round(cartTotal * 100), reference, metadata }),
     });
-    handler.openIframe();
+    const data = await res.json();
+    if (!res.ok) { setIsSubmitting(false); alert('Payment initialization failed'); return; }
+    setPaymentUrl(data?.data?.authorization_url || null);
+    setShowPaymentModal(true);
   }
 
   function copyTrackingCode() {
@@ -145,6 +129,7 @@ export default function Checkout() {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-[#F7F3EC]">
       <section className="relative h-[30vh] min-h-[200px] flex items-center justify-center">
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80')" }} />
@@ -212,7 +197,7 @@ export default function Checkout() {
               </div>
               <div className="pt-2">
                 <p className="text-sm text-black/60 mb-4">Country: <span className="font-medium text-black">Nigeria</span></p>
-                <Button type="submit" disabled={isSubmitting || !formData.state || !email || !paystackLoaded} className="w-full h-14 bg-[#D4AF37] hover:bg-[#C4A030] text-white font-medium rounded-full text-base disabled:opacity-50">
+                <Button type="submit" disabled={isSubmitting || !formData.state || !email} className="w-full h-14 bg-[#D4AF37] hover:bg-[#C4A030] text-white font-medium rounded-full text-base disabled:opacity-50">
                   {isSubmitting ? (<><Loader2 className="w-5 h-5 animate-spin mr-2" /> Processing...</>) : (<><CreditCard className="w-5 h-5 mr-2" /> Pay ₦{cartTotal.toLocaleString()}</>)}
                 </Button>
                 <p className="text-xs text-center text-black/50 mt-3 flex items-center justify-center gap-1">
@@ -257,5 +242,19 @@ export default function Checkout() {
         </div>
       </div>
     </div>
+    {showPaymentModal && paymentUrl && (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="text-lg font-semibold text-black">Complete Payment</h3>
+            <button onClick={() => setShowPaymentModal(false)} className="text-black/60 hover:text-black">Close</button>
+          </div>
+          <div className="p-0">
+            <iframe src={paymentUrl} className="w-full h-[75vh]" />
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

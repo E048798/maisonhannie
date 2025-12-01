@@ -25,9 +25,9 @@ export type Order = {
 };
 
 export function generateTrackingCode() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let code = "MH";
-  for (let i = 0; i < 13; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let code = "";
+  for (let i = 0; i < 15; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
   return code;
 }
 
