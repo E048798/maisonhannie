@@ -44,7 +44,7 @@ export default function About() {
 
               <div className="space-y-6 text-black/70 leading-relaxed">
                 <p>
-                  Maison Hannie was born from a simple yet profound belief: that handcrafted items carry a piece of the maker's soul. What began as a creative outlet during quiet evenings has blossomed into a brand that celebrates the beauty of handmade artistry.
+                  Maison Hannie was born from a simple yet profound belief: that handcrafted items carry a piece of the maker&apos;s soul. What began as a creative outlet during quiet evenings has blossomed into a brand that celebrates the beauty of handmade artistry.
                 </p>
                 <p>
                   Our founder, Sarah Hannie, discovered her passion for resin art and beadwork while searching for meaningful ways to express creativity. Each piece became not just an object, but a story of patience, precision, and love.
