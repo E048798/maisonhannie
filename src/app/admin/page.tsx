@@ -213,6 +213,8 @@ export default function Admin() {
   const [showAddBlog, setShowAddBlog] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'Resin Works', description: '', image: '', featured: false });
   const [newBlog, setNewBlog] = useState({ title: '', excerpt: '', category: 'Behind the Scenes', image: '', author: 'Sarah Hannie' });
+  const [uploadingMain, setUploadingMain] = useState(false);
+  const [uploadingExtra, setUploadingExtra] = useState(false);
 
   const [contactInfo, setContactInfo] = useState<any>({ address: '', phone: '', email: '', instagram_url: '', facebook_url: '', twitter_url: '' });
   const [contactLoaded, setContactLoaded] = useState(false);
@@ -495,56 +497,98 @@ export default function Admin() {
                 ) : orders.length === 0 ? (
                   <div className="text-center py-8 text-black/60">No orders yet</div>
                 ) : (
-                  <div className="space-y-4">
-                    {orders.map((order) => (
-                      <div key={order.id} className={cn('p-4 bg-white rounded-xl border', order.status === 'pending' ? 'border-yellow-300 bg-yellow-50' : '')}>
-                        <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                          <div>
-                            <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
-                            <p className="font-medium text-black">{order.customer_name}</p>
-                            <p className="text-sm text-black/60">{order.phone}</p>
+                  <div className="space-y-8">
+                    <div>
+                      <h3 className="text-black font-semibold mb-3">Active Orders</h3>
+                      <div className="space-y-4">
+                        {orders.filter((o) => o.status !== 'pending').map((order) => (
+                          <div key={order.id} className={cn('p-4 bg-white rounded-xl border')}>
+                            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                              <div>
+                                <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
+                                <p className="font-medium text-black">{order.customer_name}</p>
+                                <p className="text-sm text-black/60">{order.phone}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-black">₦{order.total?.toLocaleString()}</p>
+                                <p className="text-xs text-black/50">{new Date(order.created_date).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <div className="mb-4 p-3 bg-[#F7F3EC] rounded-lg text-sm">
+                              <p className="text-black/70">{order.address}, {order.landmark && `${order.landmark}, `}{order.city}, {order.state}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex flex-wrap gap-2">
+                                {order.items?.slice(0, 2).map((item: any, i: number) => (
+                                  <img key={i} src={item.image} alt={item.name} className="w-10 h-10 rounded object-cover" />
+                                ))}
+                                {order.items?.length > 2 && (
+                                  <span className="w-10 h-10 rounded bg-[#E5DCC5] flex items-center justify-center text-xs font-medium">+{order.items.length - 2}</span>
+                                )}
+                              </div>
+                              <Select value={order.status} onValueChange={(value) => updateOrderStatus(order, value)}>
+                                <SelectTrigger className="w-44">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_OPTIONS.map((status) => (
+                                    <SelectItem key={status.value} value={status.value}>
+                                      <span className={cn('px-2 py-0.5 rounded text-xs', status.color)}>{status.label}</span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-black">₦{order.total?.toLocaleString()}</p>
-                            <p className="text-xs text-black/50">{new Date(order.created_date).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-
-                        <div className="mb-4 p-3 bg-[#F7F3EC] rounded-lg text-sm">
-                          <p className="text-black/70">
-                            {order.address}, {order.landmark && `${order.landmark}, `}
-                            {order.city}, {order.state}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex flex-wrap gap-2">
-                            {order.items?.slice(0, 2).map((item: any, i: number) => (
-                              <img key={i} src={item.image} alt={item.name} className="w-10 h-10 rounded object-cover" />
-                            ))}
-                            {order.items?.length > 2 && (
-                              <span className="w-10 h-10 rounded bg-[#E5DCC5] flex items-center justify-center text-xs font-medium">+{order.items.length - 2}</span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {order.status === 'pending' && <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>}
-                          </div>
-                          <Select value={order.status} onValueChange={(value) => updateOrderStatus(order, value)}>
-                            <SelectTrigger className="w-44">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {STATUS_OPTIONS.map((status) => (
-                                <SelectItem key={status.value} value={status.value}>
-                                  <span className={cn('px-2 py-0.5 rounded text-xs', status.color)}>{status.label}</span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        ))}
+                        {orders.filter((o) => o.status !== 'pending').length === 0 && (
+                          <div className="text-black/60">No active orders</div>
+                        )}
                       </div>
-                    ))}
+                    </div>
+                    <div>
+                      <h3 className="text-black font-semibold mb-3">Pending Orders</h3>
+                      <div className="space-y-4">
+                        {orders.filter((o) => o.status === 'pending').map((order) => (
+                          <div key={order.id} className={cn('p-4 rounded-xl border border-yellow-300 bg-yellow-50')}>
+                            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                              <div>
+                                <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
+                                <p className="font-medium text-black">{order.customer_name}</p>
+                                <p className="text-sm text-black/60">{order.phone}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-black">₦{order.total?.toLocaleString()}</p>
+                                <p className="text-xs text-black/50">{new Date(order.created_date).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <div className="mb-4 p-3 bg-[#F7F3EC] rounded-lg text-sm">
+                              <p className="text-black/70">{order.address}, {order.landmark && `${order.landmark}, `}{order.city}, {order.state}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
+                              </div>
+                              <Select value={order.status} onValueChange={(value) => updateOrderStatus(order, value)}>
+                                <SelectTrigger className="w-44">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_OPTIONS.map((status) => (
+                                    <SelectItem key={status.value} value={status.value}>
+                                      <span className={cn('px-2 py-0.5 rounded text-xs', status.color)}>{status.label}</span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        ))}
+                        {orders.filter((o) => o.status === 'pending').length === 0 && (
+                          <div className="text-black/60">No pending orders</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -580,6 +624,45 @@ export default function Admin() {
                       <Input placeholder="Image URL" value={newProduct.image} onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })} />
                     </div>
                     <Textarea placeholder="Description" value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} className="mb-4" />
+                    <div className="grid md:grid-cols-2 gap-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <label className="text-sm text-black/60">Upload Main Image</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            setUploadingMain(true);
+                            const url = await uploadFile(f, 'products');
+                            if (url) setNewProduct((np) => ({ ...np, image: url }));
+                            setUploadingMain(false);
+                          }}
+                        />
+                        {uploadingMain && <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="text-sm text-black/60">Upload Additional Images</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (!files.length) return;
+                            setUploadingExtra(true);
+                            const urls: string[] = [];
+                            for (const f of files) {
+                              const u = await uploadFile(f, 'products');
+                              if (u) urls.push(u);
+                            }
+                            setNewProduct((np) => ({ ...(np as any), images: [ ...(((np as any).images) || []), ...urls ] }));
+                            setUploadingExtra(false);
+                          }}
+                        />
+                        {uploadingExtra && <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />}
+                      </div>
+                    </div>
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <p className="text-sm text-black/60 mb-2">Additional Image URLs (comma-separated)</p>

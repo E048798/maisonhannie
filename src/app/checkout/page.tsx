@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/components/cart/CartContext";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ const NIGERIAN_STATES = [
 
 export default function Checkout() {
   const { cart, cartTotal, clearCart } = useCart();
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [trackingCode, setTrackingCode] = useState("");
@@ -44,6 +46,9 @@ export default function Checkout() {
           setOrderComplete(true);
           clearCart();
           setIsSubmitting(false);
+          try {
+            router.push(`/order-placed?reference=${reference}`);
+          } catch {}
         })
         .catch(() => setIsSubmitting(false));
     }
