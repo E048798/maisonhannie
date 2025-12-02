@@ -578,15 +578,6 @@ export default function Admin() {
                         </SelectContent>
                       </Select>
                       <Input placeholder="Image URL" value={newProduct.image} onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })} />
-                      <div className="flex items-center gap-2">
-                        <input type="file" accept="image/*" onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          const url = await uploadFile(f, 'products');
-                          if (url) setNewProduct({ ...newProduct, image: url });
-                        }} />
-                        <ImagePlus className="w-4 h-4 text-[#D4AF37]" />
-                      </div>
                     </div>
                     <Textarea placeholder="Description" value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} className="mb-4" />
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
