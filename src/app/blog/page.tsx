@@ -2,24 +2,46 @@
 import { useState, useEffect } from "react";
 import BlogCard from "@/components/blog/BlogCard";
 import { BlogCardSkeleton } from "@/components/ui/Shimmer";
-import { blogPosts } from "@/components/data/dummyData";
+import { supabase } from "@/lib/supabaseClient";
 import Newsletter from "@/components/shared/Newsletter";
 import { Button } from "@/components/ui/button";
 import { BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Blog() {
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
+  const [posts, setPosts] = useState<any[]>([]);
 
   const categories = ["all", "Behind the Scenes", "Trends", "Recipes", "Sustainability"] as const;
 
-  const filteredPosts = activeCategory === "all" ? blogPosts : blogPosts.filter((p) => p.category === activeCategory);
+  const filteredPosts = activeCategory === "all" ? posts : posts.filter((p) => p.category === activeCategory);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    supabase.from('site_settings').select('show_blog').limit(1).then(({ data }) => {
+      const s = (data && data[0]) || null;
+      setBlocked(!(s?.show_blog ?? true));
+      setSettingsLoaded(true);
+    });
+    supabase.from("blog_posts").select("*").then(({ data }) => {
+      setPosts(data || []);
+      setIsLoading(false);
+    });
   }, []);
+
+  if (settingsLoaded && blocked) {
+    return (
+      <div className="pt-24 pb-20 min-h-screen bg-[#F7F3EC] flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-serif text-black mb-4">404 — Page Not Found</h1>
+          <p className="text-black/60 mb-6">This page is currently unavailable.</p>
+          <a href="/" className="inline-block px-6 py-3 rounded-full bg-[#D4AF37] text-white">Go Home</a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

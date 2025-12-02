@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { CartProvider } from "@/components/cart/CartContext";
+import { FavoritesProvider } from "@/components/favorites/FavoritesContext";
 import { AdminProvider } from "@/components/admin/AdminContext";
 import Header from "@/components/shared/Header";
 import CartDrawer from "@/components/cart/CartDrawer";
@@ -24,16 +25,18 @@ export default function RootLayout({
       <body className={inter.className}>
         <AdminProvider>
           <CartProvider>
-            <div className="min-h-screen bg-[#F7F3EC] font-sans">
-              <Header />
-              <CartDrawer />
+            <FavoritesProvider>
+              <div className="min-h-screen bg-[#F7F3EC] font-sans">
+                <Header />
+                <CartDrawer />
 
-              <main>
-                {children}
-              </main>
+                <main>
+                  {children}
+                </main>
 
-              <Footer />
-            </div>
+                <Footer />
+              </div>
+            </FavoritesProvider>
           </CartProvider>
         </AdminProvider>
       </body>

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Shimmer } from '@/components/ui/Shimmer';
-import { ArrowLeft, ThumbsUp, Heart, PartyPopper, Eye, MessageCircle, Send, User, Share2, Facebook, Twitter } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, Heart, PartyPopper, Eye, MessageCircle, Send, User, Share2, Facebook, Twitter, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Comment = { id: number; name: string; comment: string; date: string };
@@ -39,6 +39,7 @@ export default function BlogPost() {
   const [userReactions, setUserReactions] = useState({ likes: false, hearts: false, claps: false });
   const [comments, setComments] = useState<Comment[]>(initialPost?.comments ?? []);
   const [newComment, setNewComment] = useState({ name: '', comment: '' });
+  const [commentLoading, setCommentLoading] = useState(false);
   
 
   function handleReaction(type: 'likes' | 'hearts' | 'claps') {
@@ -49,6 +50,7 @@ export default function BlogPost() {
   function handleAddComment(e: React.FormEvent) {
     e.preventDefault();
     if (newComment.name && newComment.comment) {
+      setCommentLoading(true);
       setComments((prev) => [
         ...prev,
         {
@@ -59,6 +61,7 @@ export default function BlogPost() {
         },
       ]);
       setNewComment({ name: '', comment: '' });
+      setCommentLoading(false);
     }
   }
 
@@ -192,8 +195,8 @@ export default function BlogPost() {
               className="bg-white border-[#D4AF37]/20 mb-4 min-h-[100px]"
               required
             />
-            <Button type="submit" className="bg-[#D4AF37] hover:bg-[#C4A030] text-white rounded-full">
-              <Send className="w-4 h-4 mr-2" /> Post Comment
+            <Button type="submit" disabled={commentLoading} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white rounded-full">
+              {commentLoading ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" /> Posting...</>) : (<><Send className="w-4 h-4 mr-2" /> Post Comment</>)}
             </Button>
           </form>
 

@@ -7,11 +7,20 @@ import { cn } from "@/lib/utils";
 
 const slides = [
   {
+    id: 0,
+    title: "Tailor Works",
+    subtitle: "Women’s Handmade Gowns",
+    description: "Custom-tailored gowns crafted for women with timeless elegance",
+    image: "https://iagnlzvwcrqsscaloauy.supabase.co/storage/v1/object/public/Images/13025.jpg",
+    href: "/tailor",
+    color: "from-violet-900/70",
+  },
+  {
     id: 1,
     title: "Resin Works",
     subtitle: "Artisan Creations",
     description: "Discover handcrafted resin trays, coasters, and wall art that transform your space",
-    image: "https://images.unsplash.com/photo-1616627547584-bf28cee262db?w=1920&q=80",
+    image: "https://iagnlzvwcrqsscaloauy.supabase.co/storage/v1/object/public/Images/2148734208.jpg",
     href: "/resin",
     color: "from-blue-900/70",
   },
@@ -64,8 +73,8 @@ export default function HeroSlider() {
   }, []);
 
   const goToSlide = (index: number) => setCurrentSlide(index);
-  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % slides.length);
+  const prevSlide = () => {};
+  const nextSlide = () => {};
 
   if (isLoading) {
     return (
@@ -92,7 +101,7 @@ export default function HeroSlider() {
           <div className={cn("absolute inset-0 bg-gradient-to-r to-transparent", slide.color)} />
           <div className="absolute inset-0 bg-black/30" />
 
-          <div className="relative h-full max-w-7xl mx-auto px-4 flex items-center">
+          <div className="relative h-full max-w-7xl mx-auto px-4 pl-[30px] flex items-center">
             <div
               className={cn(
                 "max-w-xl transition-all duration-1000 delay-300",
@@ -121,32 +130,7 @@ export default function HeroSlider() {
         </div>
       ))}
 
-      <button
-        onClick={prevSlide}
-        className="absolute left-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20"
-        aria-label="Previous slide"
-      >
-        <ChevronLeft className="w-6 h-6" />
-      </button>
-
-      <button
-        onClick={nextSlide}
-        className="absolute right-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20"
-        aria-label="Next slide"
-      >
-        <ChevronRight className="w-6 h-6" />
-      </button>
-
-      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-3">
-        {slides.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={cn("h-2 rounded-full transition-all duration-300", index === currentSlide ? "w-8 bg-[#D4AF37]" : "w-2 bg-white/50 hover:bg-white")}
-            aria-label={`Go to slide ${index + 1}`}
-          />
-        ))}
-      </div>
+      
     </section>
   );
 }

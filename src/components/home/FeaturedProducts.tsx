@@ -1,20 +1,55 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { allProducts } from "@/components/data/dummyData";
 import ProductCard from "@/components/shared/ProductCard";
 import { ProductCardSkeleton } from "@/components/ui/Shimmer";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/cart/CartContext";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function FeaturedProducts() {
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { addToCart } = useCart();
+  const [products, setProducts] = useState<any[]>([]);
 
-  const featuredProducts = allProducts.filter((p) => p.featured).slice(0, 8);
-
-  
+  useEffect(() => {
+    supabase
+      .from("products")
+      .select("*")
+      .then(({ data }) => {
+        const prods = (data || []).filter((p: any) => p.featured).slice(0, 8);
+        setProducts(prods);
+        const ids = prods.map((p: any) => p.id);
+        if (ids.length) {
+          supabase
+            .from("reviews")
+            .select("id, name, rating, comment, created_at, product_id")
+            .in("product_id", ids)
+            .order("created_at", { ascending: false })
+            .then(({ data: rdata }) => {
+              const reviews = rdata || [];
+              const stats: Record<number, { count: number; sum: number }> = {};
+              reviews.forEach((r: any) => {
+                const pid = r.product_id as number;
+                if (!stats[pid]) stats[pid] = { count: 0, sum: 0 };
+                stats[pid].count += 1;
+                stats[pid].sum += Number(r.rating) || 0;
+              });
+              setProducts((prev) =>
+                prev.map((p) => {
+                  const s = stats[p.id];
+                  const avg = s ? Math.round((s.sum / s.count) * 10) / 10 : 0;
+                  return { ...p, reviews: s?.count ?? 0, rating: avg };
+                })
+              );
+              setIsLoading(false);
+            });
+        } else {
+          setIsLoading(false);
+        }
+      });
+  }, []);
 
   return (
     <section className="py-20 bg-white">
@@ -29,9 +64,13 @@ export default function FeaturedProducts() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
-          ))}
+          {isLoading ? (
+            [...Array(8)].map((_, i) => <ProductCardSkeleton key={i} />)
+          ) : (
+            products.map((product) => (
+              <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
+            ))
+          )}
         </div>
 
         <div className="text-center mt-12">

@@ -5,6 +5,7 @@ type Order = {
   tracking_code: string;
   customer_name: string;
   phone: string;
+  email?: string;
   total: number;
   created_date: string;
   address: string;
@@ -14,6 +15,7 @@ type Order = {
   status: string;
   status_history?: { status: string; timestamp: string; note?: string }[];
   items: OrderItem[];
+  promo_sent?: boolean;
 };
 
 let _authenticated = false;
@@ -25,6 +27,7 @@ let _orders: Order[] = [
     tracking_code: "MH-2025-0001",
     customer_name: "Tomiwa A.",
     phone: "+2348012345678",
+    email: "tomiwa@example.com",
     total: 58000,
     created_date: new Date(Date.now() - 86400000).toISOString(),
     address: "12 Artisan Way",
@@ -41,6 +44,7 @@ let _orders: Order[] = [
     tracking_code: "MH-2025-0002",
     customer_name: "Kemi O.",
     phone: "+2348098765432",
+    email: "kemi@example.com",
     total: 32000,
     created_date: new Date().toISOString(),
     address: "44 Market Street",
@@ -54,6 +58,7 @@ let _orders: Order[] = [
     tracking_code: "MH-2025-0003",
     customer_name: "Bisi O.",
     phone: "+2348022222222",
+    email: "bisi@example.com",
     total: 150000,
     created_date: new Date(Date.now() - 172800000).toISOString(),
     address: "9 Palm Grove",

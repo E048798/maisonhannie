@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,11 +18,51 @@ export async function GET(req: NextRequest) {
         'Content-Type': 'application/json',
       },
     });
-    const data = await res.json();
-    if (!res.ok) {
-      return new Response(JSON.stringify({ error: data }), { status: res.status });
+  const data = await res.json();
+  if (!res.ok) {
+    return new Response(JSON.stringify({ error: data }), { status: res.status });
+  }
+  try {
+    const payload = data?.data;
+    const status = String(payload?.status || '')
+    const reference = String(payload?.reference || '')
+    const md = payload?.metadata || {}
+    if (status === 'success' && reference) {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+      const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined;
+      const adminSupabase = serviceRole ? createClient(url, serviceRole) : supabase;
+      const statusHistory = [{ status: 'confirmed', timestamp: new Date().toISOString(), note: 'Payment verified' }];
+      await adminSupabase.from('orders').insert({
+        tracking_code: reference,
+        customer_name: String(md?.customer_name || ''),
+        phone: String(md?.phone || ''),
+        address: String(md?.address || ''),
+        landmark: md?.landmark ? String(md.landmark) : null,
+        city: String(md?.city || ''),
+        state: String(md?.state || ''),
+        items: md?.items || [],
+        total: Number(md?.total || 0),
+        status: 'confirmed',
+        status_history: statusHistory,
+        email: String(md?.email || ''),
+      });
+      const name = String(md?.customer_name || '');
+      const email = String(md?.email || '');
+      if (email) {
+        fetch(`${new URL(req.url).origin}/api/admin/order-status-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, status: 'confirmed', tracking_code: reference, customer_name: name })
+        }).catch(() => {});
+      }
+      fetch(`${new URL(req.url).origin}/api/admin/new-order-alert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracking_code: reference, total: Number(md?.total || 0), customer_name: name, created_date: new Date().toISOString() })
+      }).catch(() => {});
     }
-    return new Response(JSON.stringify(data), { status: 200 });
+  } catch {}
+  return new Response(JSON.stringify(data), { status: 200 });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), { status: 500 });
   }

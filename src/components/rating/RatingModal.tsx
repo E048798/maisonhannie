@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import StarRating from "@/components/shared/StarRating";
@@ -9,10 +10,32 @@ export default function RatingModal({ isOpen, onClose, product }: { isOpen: bool
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [productIdInput, setProductIdInput] = useState<string>("");
+  const [trackingCodeInput, setTrackingCodeInput] = useState<string>("");
+  const [allowPublic, setAllowPublic] = useState<boolean>(true);
 
-  function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    supabase.from("site_settings").select("allow_public_reviews").limit(1).then(({ data }) => {
+      if (data && data.length) setAllowPublic(!!data[0].allow_public_reviews);
+    });
+    setProductIdInput(String(product?.id ?? ""));
+  }, [product]);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (rating > 0) {
+    if (!allowPublic) return;
+    const pid = Number(productIdInput);
+    if (rating > 0 && pid && product && pid === product.id) {
+      let verified = false;
+      const code = trackingCodeInput.trim().toUpperCase();
+      if (code) {
+        const { data } = await supabase.from('orders').select('items').eq('tracking_code', code).limit(1);
+        const order = data && data[0];
+        if (order && Array.isArray(order.items)) {
+          verified = !!order.items.find((it: any) => Number(it?.id) === product.id);
+        }
+      }
+      await supabase.from("reviews").insert({ product_id: pid, name: "Anonymous", rating, comment, verified, tracking_code: code || null });
       setSubmitted(true);
     }
   }
@@ -29,8 +52,8 @@ export default function RatingModal({ isOpen, onClose, product }: { isOpen: bool
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full sm:max-w-md bg-[#F7F3EC] rounded-2xl shadow-lg p-6">
+      <div className="absolute inset-0 flex items-center justify-center p-4 overflow-auto">
+        <div className="w-full sm:max-w-md bg-[#F7F3EC] rounded-2xl shadow-lg p-6 max-h-[80vh] overflow-auto">
           <div className="mb-4">
             <h2 className="text-black font-serif text-xl">{submitted ? "Thank You!" : "Rate This Product"}</h2>
           </div>
@@ -72,16 +95,27 @@ export default function RatingModal({ isOpen, onClose, product }: { isOpen: bool
 
               <div>
                 <label className="text-sm text-black/70 block mb-2">Share your experience (optional)</label>
-                <Textarea placeholder="What did you like or dislike about this product?" value={comment} onChange={(e) => setComment(e.target.value)} className="bg-white border-[#D4AF37]/20 focus:border-[#D4AF37] min-h-[100px]" />
-              </div>
+              <Textarea placeholder="What did you like or dislike about this product?" value={comment} onChange={(e) => setComment(e.target.value)} className="bg-white border-[#D4AF37]/20 focus:border-[#D4AF37] min-h-[100px]" />
+            </div>
 
-              <div className="flex gap-3">
-                <Button type="button" variant="outline" onClick={handleClose} className="flex-1 rounded-full border-[#D4AF37]/30">Cancel</Button>
-                <Button type="submit" disabled={rating === 0} className="flex-1 bg-[#D4AF37] hover:bg-[#C4A030] text-white rounded-full disabled:opacity-50">
-                  <Send className="w-4 h-4 mr-2" />
-                  Submit Review
-                </Button>
-              </div>
+            <div>
+              <label className="text-sm text-black/70 block mb-2">Product ID</label>
+              <input value={productIdInput} onChange={(e) => setProductIdInput(e.target.value)} className="w-full h-10 rounded-md border border-[#D4AF37]/30 px-3 bg-white" required />
+            </div>
+
+            <div>
+              <label className="text-sm text-black/70 block mb-2">Tracking Code (optional, verifies purchase)</label>
+              <input value={trackingCodeInput} onChange={(e) => setTrackingCodeInput(e.target.value)} className="w-full h-10 rounded-md border border-[#D4AF37]/30 px-3 bg-white" />
+            </div>
+
+            <div className="flex gap-3">
+              <Button type="button" onClick={handleClose} className="flex-1 bg-black hover:bg-black/90 text-white rounded-full">Cancel</Button>
+              <Button type="submit" disabled={rating === 0 || !allowPublic || Number(productIdInput) !== product.id} className="flex-1 bg-[#D4AF37] hover:bg-[#C4A030] text-white rounded-full disabled:opacity-50">
+                <Send className="w-4 h-4 mr-2" />
+                Submit Review
+              </Button>
+              {!allowPublic && <span className="text-xs text-red-600">Reviews are disabled by admin</span>}
+            </div>
             </form>
           )}
         </div>

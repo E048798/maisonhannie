@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Newsletter from "@/components/shared/Newsletter";
+import HomeReviews from "@/components/home/HomeReviews";
 import { Heart, Sparkles, Award, Target, Users, Palette } from "lucide-react";
 
 export default function About() {
@@ -47,7 +48,7 @@ export default function About() {
                   Maison Hannie was born from a simple yet profound belief: that handcrafted items carry a piece of the maker&apos;s soul. What began as a creative outlet during quiet evenings has blossomed into a brand that celebrates the beauty of handmade artistry.
                 </p>
                 <p>
-                  Our founder, Sarah Hannie, discovered her passion for resin art and beadwork while searching for meaningful ways to express creativity. Each piece became not just an object, but a story of patience, precision, and love.
+                  Our founder, Hanifat Olawumi, discovered her passion for resin art and beadwork while searching for meaningful ways to express creativity. Each piece became not just an object, but a story of patience, precision, and love.
                 </p>
                 <p>
                   Today, Maison Hannie encompasses three distinct yet harmonious collections: stunning resin works, elegant bead jewelry, and delicious homemade catering. Together, they represent our commitment to bringing handcrafted beauty into every aspect of life.
@@ -60,7 +61,7 @@ export default function About() {
             </div>
 
             <div className="relative">
-              <img src="https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?w=600&q=80" alt="Founder" className="rounded-3xl shadow-2xl" />
+              <img src="https://iagnlzvwcrqsscaloauy.supabase.co/storage/v1/object/public/Images/IMG-20251202-WA0005.jpg" alt="Founder" className="rounded-3xl shadow-2xl" />
               <div className="absolute -bottom-8 -left-8 bg-white p-6 rounded-2xl shadow-xl">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full bg-[#D4AF37] flex items-center justify-center">
@@ -115,23 +116,7 @@ export default function About() {
         </div>
       </section>
 
-      <section className="py-20 bg-black">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { value: "500+", label: "Happy Clients" },
-              { value: "1200+", label: "Products Made" },
-              { value: "50+", label: "Events Catered" },
-              { value: "5", label: "Years of Craft" },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <p className="text-4xl md:text-5xl font-bold text-[#D4AF37] mb-2">{stat.value}</p>
-                <p className="text-white/70">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <HomeReviews />
 
       <Newsletter />
     </div>

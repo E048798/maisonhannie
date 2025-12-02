@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Star, ShoppingBag, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useFavorites } from "@/components/favorites/FavoritesContext";
 
 type Product = {
   id: number;
@@ -18,7 +19,7 @@ type Product = {
 };
 
 export default function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart?: (p: Product) => void }) {
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -27,13 +28,13 @@ export default function ProductCard({ product, onAddToCart }: { product: Product
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <button onClick={() => setIsWishlisted(!isWishlisted)} className="absolute top-4 right-4 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:scale-110 transition-transform">
-        <Heart className={cn("w-4 h-4 transition-colors", isWishlisted ? "fill-pink-400 text-pink-400" : "text-black/50")} />
+      <button onClick={() => toggleFavorite(product)} className="absolute top-4 right-4 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:scale-110 transition-transform">
+        <Heart className={cn("w-4 h-4 transition-colors", isFavorite(product.id) ? "fill-pink-400 text-pink-400" : "text-black/50")} />
       </button>
 
       {product.featured && <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-[#D4AF37] text-white text-xs font-medium rounded-full">Featured</div>}
 
-      <Link href={`/product?id=${product.id}`} className="relative h-64 overflow-hidden bg-[#F7F3EC] block">
+      <Link href={`/product/${product.id}`} className="relative h-64 overflow-hidden bg-[#F7F3EC] block">
         <img src={product.image} alt={product.name} className={cn("w-full h-full object-cover transition-transform duration-700", isHovered && "scale-110")} />
         <div className={cn("absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/50 to-transparent transition-all duration-300", isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4")}> 
           <Button variant="secondary" onClick={() => onAddToCart?.(product)} className="w-full transition-colors rounded-lg">

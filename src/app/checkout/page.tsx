@@ -55,7 +55,7 @@ export default function Checkout() {
     e.preventDefault();
     setIsSubmitting(true);
     const reference = generateTrackingCode();
-    const metadata = { customer_name: formData.name, phone: formData.phone, items: cart };
+    const metadata = { customer_name: formData.name, phone: formData.phone, address: formData.address, landmark: formData.landmark, city: formData.city, state: formData.state, items: cart, total: cartTotal, email };
     const res = await fetch('/api/paystack/initialize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

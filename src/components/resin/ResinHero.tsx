@@ -6,15 +6,9 @@ import { Sparkles, Palette } from "lucide-react";
 
 export default function ResinHero() {
   const [heroUrl, setHeroUrl] = useState<string>(
-    "https://images.unsplash.com/photo-1616627547584-bf28cee262db?w=1920&q=80"
+    "https://iagnlzvwcrqsscaloauy.supabase.co/storage/v1/object/public/Images/2148734208.jpg"
   );
 
-  useEffect(() => {
-    const candidate = "/resin-hero.jpg";
-    const img = new Image();
-    img.src = candidate;
-    img.onload = () => setHeroUrl(candidate);
-  }, []);
 
   return (
     <section className="relative min-h-[80vh] flex items-center overflow-hidden">

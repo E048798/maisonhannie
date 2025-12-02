@@ -47,7 +47,11 @@ export function SelectContent({ children }: { children: React.ReactNode }) {
   const ctx = React.useContext<SelectContextValue | null>(SelectContext);
   if (!ctx) return null;
   if (!ctx.open) return null;
-  return <div className="absolute mt-2 z-10 min-w-[10rem] rounded-md border bg-white shadow-sm">{children}</div>;
+  return (
+    <div className="absolute mt-2 z-10 min-w-[10rem] rounded-md border bg-white shadow-sm max-h-64 overflow-y-auto">
+      {children}
+    </div>
+  );
 }
 
 export function SelectItem({ value, children }: { value: string; children: React.ReactNode }) {

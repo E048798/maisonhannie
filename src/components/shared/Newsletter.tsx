@@ -2,17 +2,32 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Check } from "lucide-react";
+import { Sparkles, Check, Loader2 } from "lucide-react";
 
 export default function Newsletter() {
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (email) {
-      setSubmitted(true);
-      setEmail("");
+    if (!email) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name: firstName }) });
+      if (res.ok) {
+        setSubmitted(true);
+        setEmail("");
+        setFirstName("");
+        setError(null);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data?.error || 'Could not subscribe. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -39,10 +54,16 @@ export default function Newsletter() {
             <span className="font-medium">Thank you for subscribing!</span>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <Input type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} className="flex-1 h-12 bg-white border-[#D4AF37]/20 focus:border-[#D4AF37] rounded-full px-5" required />
-            <Button type="submit" className="h-12 px-8 bg-[#D4AF37] hover:bg-[#C4A030] text-white rounded-full font-medium">Subscribe</Button>
-          </form>
+          <>
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+              <Input type="text" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="flex-1 h-12 bg-white border-[#D4AF37]/20 focus:border-[#D4AF37] rounded-full px-5" />
+              <Input type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} className="flex-1 h-12 bg-white border-[#D4AF37]/20 focus:border-[#D4AF37] rounded-full px-5" required />
+              <Button type="submit" disabled={loading} className="h-12 px-8 bg-[#D4AF37] hover:bg-[#C4A030] text-white rounded-full font-medium">
+                {loading ? (<><Loader2 className="w-5 h-5 animate-spin" /> <span className="ml-2">Submitting...</span></>) : 'Subscribe'}
+              </Button>
+            </form>
+            {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          </>
         )}
       </div>
     </section>

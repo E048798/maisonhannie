@@ -294,7 +294,58 @@ export const cateringMenu = [
   },
 ];
 
-export const allProducts = [...resinProducts, ...beadProducts, ...cateringMenu];
+export const tailorProducts = [
+  {
+    id: 201,
+    name: "Classic A-Line Dress",
+    category: "Fashion Design",
+    subcategory: "Dresses",
+    price: 95000,
+    image: "https://images.pexels.com/photos/949670/pexels-photo-949670.jpeg?auto=compress&cs=tinysrgb&w=600",
+    rating: 5,
+    reviews: 12,
+    featured: true,
+    description: "Elegant handmade A-line dress tailored to fit."
+  },
+  {
+    id: 202,
+    name: "Minimalist Crop Top",
+    category: "Fashion Design",
+    subcategory: "Tops",
+    price: 35000,
+    image: "https://images.pexels.com/photos/7679729/pexels-photo-7679729.jpeg?auto=compress&cs=tinysrgb&w=600",
+    rating: 4,
+    reviews: 8,
+    featured: true,
+    description: "Handmade crop top with clean lines and soft fabric."
+  },
+  {
+    id: 203,
+    name: "Two-Piece Set",
+    category: "Fashion Design",
+    subcategory: "Sets",
+    price: 120000,
+    image: "https://images.pexels.com/photos/1191523/pexels-photo-1191523.jpeg?auto=compress&cs=tinysrgb&w=600",
+    rating: 5,
+    reviews: 20,
+    featured: false,
+    description: "Coordinated handmade set for versatile styling."
+  },
+  {
+    id: 204,
+    name: "Statement Belt",
+    category: "Fashion Design",
+    subcategory: "Accessories",
+    price: 18000,
+    image: "https://images.pexels.com/photos/1598505/pexels-photo-1598505.jpeg?auto=compress&cs=tinysrgb&w=600",
+    rating: 4,
+    reviews: 6,
+    featured: false,
+    description: "Handmade accessory to complete your outfit."
+  }
+];
+
+export const allProducts = [...resinProducts, ...beadProducts, ...cateringMenu, ...tailorProducts];
 
 export const blogPosts = [
   {

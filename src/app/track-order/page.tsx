@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Package, CheckCircle, Truck, MapPin, Clock, AlertCircle } from "lucide-react";
@@ -55,13 +55,10 @@ export default function TrackOrder() {
     setIsLoading(true);
     setError("");
     setSearched(true);
-    const orders = await base44.entities.Order.filter({ tracking_code: code.toUpperCase() });
-    if (orders.length > 0) {
-      setOrder(orders[0] as Order);
-    } else {
-      setOrder(null);
-      setError("No order found with this tracking code");
-    }
+    const { data } = await supabase.from('orders').select('*').eq('tracking_code', code.toUpperCase()).limit(1);
+    const found = (data && data[0]) || null;
+    if (found) setOrder(found as any);
+    else { setOrder(null); setError("No order found with this tracking code"); }
     setIsLoading(false);
   }
 
