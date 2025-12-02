@@ -56,6 +56,13 @@ export default function Checkout() {
     setIsSubmitting(true);
     const reference = generateTrackingCode();
     const metadata = { customer_name: formData.name, phone: formData.phone, address: formData.address, landmark: formData.landmark, city: formData.city, state: formData.state, items: cart, total: cartTotal, email };
+    try {
+      await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference, customer_name: formData.name, phone: formData.phone, address: formData.address, landmark: formData.landmark, city: formData.city, state: formData.state, items: cart, total: cartTotal, email }),
+      });
+    } catch {}
     const res = await fetch('/api/paystack/initialize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -220,7 +227,7 @@ export default function Checkout() {
                 </div>
               ))}
             </div>
-            <div className="border-t border-[#D4AF37]/10 pt-4 space-y-3">
+          <div className="border-t border-[#D4AF37]/10 pt-4 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-black/70">Subtotal</span>
                 <span className="text-black">₦{cartTotal.toLocaleString()}</span>
@@ -231,9 +238,13 @@ export default function Checkout() {
               </div>
               <div className="flex justify-between text-lg font-bold pt-3 border-t border-[#D4AF37]/10">
                 <span className="text-black">Total</span>
-                <span className="text-[#D4AF37]">₦{cartTotal.toLocaleString()}</span>
-              </div>
+              <span className="text-[#D4AF37]">₦{cartTotal.toLocaleString()}</span>
             </div>
+            <div className="mt-5 p-4 rounded-xl bg-[#F7F3EC] text-sm text-black/70">
+              <p className="mb-2">Some orders will be crafted and designed. It may take days to complete; Hannie will reach out to you to discuss details.</p>
+              <p>Shipping will be decided between the rider and the customer.</p>
+            </div>
+          </div>
           </div>
         </div>
       </div>

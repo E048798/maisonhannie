@@ -33,24 +33,52 @@ export async function GET(req: NextRequest) {
       const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY || (process.env as any).SUPABASE_SERVICE_ROLE) as string | undefined;
       const adminSupabase = serviceRole ? createClient(url, serviceRole) : supabase;
       const statusHistory = [{ status: 'confirmed', timestamp: new Date().toISOString(), note: 'Payment verified' }];
-      const { data: inserted, error: insertError } = await adminSupabase.from('orders').insert({
-        tracking_code: reference,
-        customer_name: String(md?.customer_name || ''),
-        phone: String(md?.phone || ''),
-        address: String(md?.address || ''),
-        landmark: md?.landmark ? String(md.landmark) : null,
-        city: String(md?.city || ''),
-        state: String(md?.state || ''),
-        items: md?.items || [],
-        total: Number(md?.total || 0),
-        status: 'confirmed',
-        status_history: statusHistory,
-        email: String(md?.email || ''),
-      }).select('*').limit(1);
-      if (insertError) {
-        return new Response(JSON.stringify({ ...data, order_error: insertError.message }), { status: 200 });
+      const existing = await adminSupabase.from('orders').select('id,status,status_history').eq('tracking_code', reference).limit(1);
+      if (existing.data && existing.data[0]) {
+        const prevHistory = Array.isArray(existing.data[0].status_history) ? existing.data[0].status_history : [];
+        const newHistory = [...prevHistory, ...statusHistory];
+        const { data: upd, error: updErr } = await adminSupabase
+          .from('orders')
+          .update({
+            customer_name: String(md?.customer_name || ''),
+            phone: String(md?.phone || ''),
+            address: String(md?.address || ''),
+            landmark: md?.landmark ? String(md.landmark) : null,
+            city: String(md?.city || ''),
+            state: String(md?.state || ''),
+            items: md?.items || [],
+            total: Number(md?.total || 0),
+            status: 'confirmed',
+            status_history: newHistory,
+            email: String(md?.email || ''),
+          })
+          .eq('tracking_code', reference)
+          .select('*')
+          .limit(1);
+        if (updErr) {
+          return new Response(JSON.stringify({ ...data, order_error: updErr.message }), { status: 200 });
+        }
+        insertedOrder = upd && upd[0] ? upd[0] : null;
+      } else {
+        const { data: inserted, error: insertError } = await adminSupabase.from('orders').insert({
+          tracking_code: reference,
+          customer_name: String(md?.customer_name || ''),
+          phone: String(md?.phone || ''),
+          address: String(md?.address || ''),
+          landmark: md?.landmark ? String(md.landmark) : null,
+          city: String(md?.city || ''),
+          state: String(md?.state || ''),
+          items: md?.items || [],
+          total: Number(md?.total || 0),
+          status: 'confirmed',
+          status_history: statusHistory,
+          email: String(md?.email || ''),
+        }).select('*').limit(1);
+        if (insertError) {
+          return new Response(JSON.stringify({ ...data, order_error: insertError.message }), { status: 200 });
+        }
+        insertedOrder = inserted && inserted[0] ? inserted[0] : null;
       }
-      insertedOrder = inserted && inserted[0] ? inserted[0] : null;
       const name = String(md?.customer_name || '');
       const email = String(md?.email || '');
       if (email) {

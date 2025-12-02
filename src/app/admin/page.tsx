@@ -72,6 +72,7 @@ export default function Admin() {
     async function loadOrders() {
       if (!isAuthenticated) return;
       setOrdersLoading(true);
+      try { await fetch('/api/admin/cleanup-pending', { method: 'POST' }); } catch {}
       const { data } = await supabase.from('orders').select('*').order('created_date', { ascending: false });
       const arr = data || [];
       setOrders(arr);
@@ -496,7 +497,7 @@ export default function Admin() {
                 ) : (
                   <div className="space-y-4">
                     {orders.map((order) => (
-                      <div key={order.id} className="p-4 bg-white rounded-xl border">
+                      <div key={order.id} className={cn('p-4 bg-white rounded-xl border', order.status === 'pending' ? 'border-yellow-300 bg-yellow-50' : '')}>
                         <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                           <div>
                             <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
@@ -526,6 +527,9 @@ export default function Admin() {
                             )}
                           </div>
 
+                          <div className="flex items-center gap-2">
+                            {order.status === 'pending' && <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>}
+                          </div>
                           <Select value={order.status} onValueChange={(value) => updateOrderStatus(order, value)}>
                             <SelectTrigger className="w-44">
                               <SelectValue />
@@ -574,6 +578,15 @@ export default function Admin() {
                         </SelectContent>
                       </Select>
                       <Input placeholder="Image URL" value={newProduct.image} onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })} />
+                      <div className="flex items-center gap-2">
+                        <input type="file" accept="image/*" onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          const url = await uploadFile(f, 'products');
+                          if (url) setNewProduct({ ...newProduct, image: url });
+                        }} />
+                        <ImagePlus className="w-4 h-4 text-[#D4AF37]" />
+                      </div>
                     </div>
                     <Textarea placeholder="Description" value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} className="mb-4" />
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
