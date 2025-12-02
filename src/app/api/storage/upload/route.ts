@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
     const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) as string
     const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE) as string
-    if (!url || !serviceKey) return new Response(JSON.stringify({ error: 'Server configuration error', details: { url: !!url, key: !!serviceKey } }), { status: 500 })
+    if (!url || !serviceKey) return new Response(JSON.stringify({ error: 'Server configuration error', details: { url: !!url, key: !!serviceKey, bucket } }), { status: 500 })
     const admin = createClient(url, serviceKey)
 
     const ext = file.name.split('.').pop() || 'bin'
@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
     const bucketInfo = await admin.storage.getBucket(bucket)
     if (!bucketInfo?.data) {
       await admin.storage.createBucket(bucket, { public: true, fileSizeLimit: '50MB' })
+    } else if (bucketInfo.data && bucketInfo.data.public === false) {
+      await admin.storage.updateBucket(bucket, { public: true })
     }
 
     const ab = await file.arrayBuffer()
@@ -28,10 +30,10 @@ export async function POST(req: NextRequest) {
     if (error) {
       const alt = await admin.storage.from('images').upload(path, bytes, { upsert: false, contentType: file.type || 'application/octet-stream' })
       if (alt.error) {
-        return new Response(JSON.stringify({ error: alt.error.message || error.message }), { status: 400 })
+        return new Response(JSON.stringify({ error: alt.error.message || error.message, details: { triedBucket: bucket, triedAltBucket: 'images', contentType: file.type || 'application/octet-stream' } }), { status: 400 })
       }
       const { data } = admin.storage.from('images').getPublicUrl(path)
-      return new Response(JSON.stringify({ url: data.publicUrl }), { status: 200 })
+      return new Response(JSON.stringify({ url: data.publicUrl, details: { usedBucket: 'images' } }), { status: 200 })
     }
     const { data } = admin.storage.from(bucket).getPublicUrl(path)
     return new Response(JSON.stringify({ url: data.publicUrl }), { status: 200 })

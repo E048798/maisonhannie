@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined;
       const adminSupabase = serviceRole ? createClient(url, serviceRole) : supabase;
       const statusHistory = [{ status: 'confirmed', timestamp: new Date().toISOString(), note: 'Payment verified' }];
-      await adminSupabase.from('orders').insert({
+      const { data: inserted, error: insertError } = await adminSupabase.from('orders').insert({
         tracking_code: reference,
         customer_name: String(md?.customer_name || ''),
         phone: String(md?.phone || ''),
@@ -45,7 +45,10 @@ export async function GET(req: NextRequest) {
         status: 'confirmed',
         status_history: statusHistory,
         email: String(md?.email || ''),
-      });
+      }).select('*').limit(1);
+      if (insertError) {
+        return new Response(JSON.stringify({ ...data, order_error: insertError.message }), { status: 200 });
+      }
       const name = String(md?.customer_name || '');
       const email = String(md?.email || '');
       if (email) {
@@ -62,8 +65,9 @@ export async function GET(req: NextRequest) {
       }).catch(() => {});
     }
   } catch {}
-  return new Response(JSON.stringify(data), { status: 200 });
+  return new Response(JSON.stringify({ ...data, order: inserted && inserted[0] ? inserted[0] : null }), { status: 200 });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), { status: 500 });
   }
 }
+export const runtime = 'nodejs'
