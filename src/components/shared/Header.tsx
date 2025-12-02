@@ -7,7 +7,7 @@ import { Menu, X, ShoppingBag, Search, User, Heart, ChevronDown } from "lucide-r
 import FavoritesModal from "@/components/favorites/FavoritesModal";
 import { useFavorites } from "@/components/favorites/FavoritesContext";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import { Shimmer } from "@/components/ui/Shimmer";
 
 const pagesWithLightHeader = ["/admin", "/blog/post"];
@@ -42,6 +42,7 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
+    const supabase = getSupabase();
     supabase
       .from('site_settings')
       .select('show_shop, show_blog, show_resin, show_beads, show_catering, show_tailor')
@@ -98,6 +99,7 @@ export default function Header() {
     }
     setSearchLoading(true);
     searchTimer.current = setTimeout(() => {
+      const supabase = getSupabase();
       supabase
         .from("products")
         .select("*")

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export default function Tailor() {
   const [reviewsLoading, setReviewsLoading] = useState(true);
 
   useEffect(() => {
+    const supabase = getSupabase();
     supabase.from('site_settings').select('show_tailor').limit(1).then(({ data }) => {
       const s = (data && data[0]) || null;
       setBlocked(!(s?.show_tailor ?? true));

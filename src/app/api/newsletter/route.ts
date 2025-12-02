@@ -1,5 +1,5 @@
 export const runtime = 'nodejs';
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabase } from '@/lib/supabaseClient';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -7,6 +7,7 @@ export async function POST(req: Request) {
     const name = String(body?.name || '').trim();
     if (!email) return new Response(JSON.stringify({ error: 'Email required' }), { status: 400 });
 
+    const supabase = getSupabase();
     const { data: existing, error: selectError } = await supabase
       .from('newsletter_subscriptions')
       .select('id')

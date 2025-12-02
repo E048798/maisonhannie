@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import ProductCard from "@/components/shared/ProductCard";
 import { ProductCardSkeleton, Shimmer } from "@/components/ui/Shimmer";
 import ReviewCard from "@/components/shared/ReviewCard";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ export default function Shop() {
   const [reviewsLoading, setReviewsLoading] = useState(true);
 
   useEffect(() => {
+    const supabase = getSupabase();
     supabase.from('site_settings').select('show_shop').limit(1).then(({ data }) => {
       const s = (data && data[0]) || null;
       setBlocked(!(s?.show_shop ?? true));

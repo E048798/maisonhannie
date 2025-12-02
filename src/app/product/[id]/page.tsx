@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import { useCart } from "@/components/cart/CartContext";
 import { useFavorites } from "@/components/favorites/FavoritesContext";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     setProductLoading(true);
+    const supabase = getSupabase();
     supabase.from("products").select("*").eq("id", id).then(({ data }) => {
       const prod = (data && data[0]) || null;
       setProduct(prod as any);
@@ -59,6 +60,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     setReviewsLoading(true);
+    const supabase = getSupabase();
     supabase
       .from("reviews")
       .select("id, name, rating, comment, created_at, product_id")

@@ -6,7 +6,7 @@ import { ProductCardSkeleton, Shimmer } from "@/components/ui/Shimmer";
 import ReviewCard from "@/components/shared/ReviewCard";
 import Newsletter from "@/components/shared/Newsletter";
 import { beadProducts } from "@/components/data/dummyData";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Gem, Star } from "lucide-react";
@@ -25,6 +25,7 @@ export default function BeadWorks() {
   const filters = ["all", "Bracelets", "Necklaces", "Sets"] as const;
 
   useEffect(() => {
+    const supabase = getSupabase();
     supabase.from('site_settings').select('show_beads').limit(1).then(({ data }) => {
       const s = (data && data[0]) || null;
       setBlocked(!(s?.show_beads ?? true));

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Package, CheckCircle, Truck, MapPin, Clock, AlertCircle } from "lucide-react";
@@ -55,6 +55,7 @@ export default function TrackOrder() {
     setIsLoading(true);
     setError("");
     setSearched(true);
+    const supabase = getSupabase();
     const { data } = await supabase.from('orders').select('*').eq('tracking_code', code.toUpperCase()).limit(1);
     const found = (data && data[0]) || null;
     if (found) setOrder(found as any);

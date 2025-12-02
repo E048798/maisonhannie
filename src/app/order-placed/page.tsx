@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Copy, ArrowRight } from "lucide-react";
 
@@ -16,6 +16,7 @@ export default function OrderPlaced() {
   useEffect(() => {
     async function load() {
       if (!reference) return;
+      const supabase = getSupabase();
       const { data } = await supabase.from("orders").select("*").eq("tracking_code", reference).limit(1);
       const o = (data && data[0]) || null;
       setOrder(o);

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 
 export default function CallRequest() {
   const [name, setName] = useState("");
@@ -18,6 +18,7 @@ export default function CallRequest() {
     setLoading(true);
     setStatus(null);
     try {
+      const supabase = getSupabase();
       const { error } = await supabase.from("call_requests").insert([
         { name, phone, service, preferred_time: preferredTime, whatsapp_consent: whatsappConsent },
       ]);

@@ -9,7 +9,7 @@ import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { UtensilsCrossed, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabase } from "@/lib/supabaseClient";
 import ReviewCard from "@/components/shared/ReviewCard";
 
 export default function Catering() {
@@ -30,6 +30,7 @@ export default function Catering() {
       : products.filter((p) => p.subcategory === activeCategory);
 
   useEffect(() => {
+    const supabase = getSupabase();
     supabase.from('site_settings').select('show_catering').limit(1).then(({ data }) => {
       const s = (data && data[0]) || null;
       setBlocked(!(s?.show_catering ?? true));
