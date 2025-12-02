@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   if (!res.ok) {
     return new Response(JSON.stringify({ error: data }), { status: res.status });
   }
+  let insertedOrder: any = null;
   try {
     const payload = data?.data;
     const status = String(payload?.status || '')
@@ -49,6 +50,7 @@ export async function GET(req: NextRequest) {
       if (insertError) {
         return new Response(JSON.stringify({ ...data, order_error: insertError.message }), { status: 200 });
       }
+      insertedOrder = inserted && inserted[0] ? inserted[0] : null;
       const name = String(md?.customer_name || '');
       const email = String(md?.email || '');
       if (email) {
@@ -65,7 +67,7 @@ export async function GET(req: NextRequest) {
       }).catch(() => {});
     }
   } catch {}
-  return new Response(JSON.stringify({ ...data, order: inserted && inserted[0] ? inserted[0] : null }), { status: 200 });
+  return new Response(JSON.stringify({ ...data, order: insertedOrder }), { status: 200 });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), { status: 500 });
   }
