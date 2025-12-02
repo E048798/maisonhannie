@@ -253,6 +253,8 @@ export default function Admin() {
       category: newProduct.category,
       description: newProduct.description || '',
       featured: newProduct.featured || false,
+      images: (newProduct as any).images || [],
+      videos: (newProduct as any).videos || [],
     } as any;
     setAddProductSaving(true);
     const { data, error } = await supabase.from('products').insert(payload).select('*').limit(1);
@@ -572,40 +574,21 @@ export default function Admin() {
                         </SelectContent>
                       </Select>
                       <Input placeholder="Image URL" value={newProduct.image} onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })} />
-                      <div className="flex items-center gap-2">
-                        <input type="file" accept="image/*" onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          const url = await uploadFile(f, 'products');
-                          if (url) setNewProduct({ ...newProduct, image: url });
-                        }} />
-                        <ImagePlus className="w-4 h-4 text-[#D4AF37]" />
-                      </div>
                     </div>
                     <Textarea placeholder="Description" value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} className="mb-4" />
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <p className="text-sm text-black/60 mb-2">Additional Images</p>
-                        <input type="file" accept="image/*" multiple onChange={async (e) => {
-                          const files = Array.from(e.target.files || []);
-                          const urls: string[] = [];
-                          for (const f of files) {
-                            const u = await uploadFile(f, 'products');
-                            if (u) urls.push(u);
-                          }
-                          setNewProduct((np) => ({ ...np, images: urls } as any));
+                        <p className="text-sm text-black/60 mb-2">Additional Image URLs (comma-separated)</p>
+                        <Input placeholder="https://... , https://..." onChange={(e) => {
+                          const parts = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                          setNewProduct((np) => ({ ...(np as any), images: parts }));
                         }} />
                       </div>
                       <div>
-                        <p className="text-sm text-black/60 mb-2">Product Videos</p>
-                        <input type="file" accept="video/*" multiple onChange={async (e) => {
-                          const files = Array.from(e.target.files || []);
-                          const urls: string[] = [];
-                          for (const f of files) {
-                            const u = await uploadFile(f, 'videos');
-                            if (u) urls.push(u);
-                          }
-                          setNewProduct((np) => ({ ...np, videos: urls } as any));
+                        <p className="text-sm text-black/60 mb-2">Product Video URLs (comma-separated)</p>
+                        <Input placeholder="https://... , https://..." onChange={(e) => {
+                          const parts = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                          setNewProduct((np) => ({ ...(np as any), videos: parts }));
                         }} />
                       </div>
                     </div>
@@ -875,40 +858,21 @@ export default function Admin() {
               </SelectContent>
             </Select>
             <Input placeholder="Image URL" value={editingData.image} onChange={(e) => setEditingData({ ...editingData, image: e.target.value })} />
-            <div className="flex items-center gap-2">
-              <input type="file" accept="image/*" onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                const url = await uploadFile(f, 'products');
-                if (url) setEditingData({ ...editingData, image: url });
-              }} />
-              <ImagePlus className="w-4 h-4 text-[#D4AF37]" />
-            </div>
           </div>
           <Textarea placeholder="Description" value={editingData.description} onChange={(e) => setEditingData({ ...editingData, description: e.target.value })} className="mb-4" />
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div>
-              <p className="text-sm text-black/60 mb-2">Additional Images</p>
-              <input type="file" accept="image/*" multiple onChange={async (e) => {
-                const files = Array.from(e.target.files || []);
-                const urls: string[] = [];
-                for (const f of files) {
-                  const u = await uploadFile(f, 'products');
-                  if (u) urls.push(u);
-                }
-                setEditingData((ed: any) => ({ ...ed, images: [...(ed.images || []), ...urls] }));
+              <p className="text-sm text-black/60 mb-2">Additional Image URLs (comma-separated)</p>
+              <Input placeholder="https://... , https://..." onChange={(e) => {
+                const parts = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                setEditingData((ed: any) => ({ ...ed, images: parts }));
               }} />
             </div>
             <div>
-              <p className="text-sm text-black/60 mb-2">Product Videos</p>
-              <input type="file" accept="video/*" multiple onChange={async (e) => {
-                const files = Array.from(e.target.files || []);
-                const urls: string[] = [];
-                for (const f of files) {
-                  const u = await uploadFile(f, 'videos');
-                  if (u) urls.push(u);
-                }
-                setEditingData((ed: any) => ({ ...ed, videos: [...(ed.videos || []), ...urls] }));
+              <p className="text-sm text-black/60 mb-2">Product Video URLs (comma-separated)</p>
+              <Input placeholder="https://... , https://..." onChange={(e) => {
+                const parts = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                setEditingData((ed: any) => ({ ...ed, videos: parts }));
               }} />
             </div>
           </div>

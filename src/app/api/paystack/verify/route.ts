@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
     const reference = String(payload?.reference || '')
     const md = payload?.metadata || {}
     if (status === 'success' && reference) {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-      const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined;
+      const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) as string;
+      const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY || (process.env as any).SUPABASE_SERVICE_ROLE) as string | undefined;
       const adminSupabase = serviceRole ? createClient(url, serviceRole) : supabase;
       const statusHistory = [{ status: 'confirmed', timestamp: new Date().toISOString(), note: 'Payment verified' }];
       const { data: inserted, error: insertError } = await adminSupabase.from('orders').insert({
