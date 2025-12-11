@@ -31,7 +31,10 @@ export async function GET(req: NextRequest) {
     if (status === 'success' && reference) {
       const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) as string;
       const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY || (process.env as any).SUPABASE_SERVICE_ROLE) as string | undefined;
-      const adminSupabase = serviceRole ? createClient(url, serviceRole) : supabase;
+      if (!url || !serviceRole) {
+        return new Response(JSON.stringify({ error: 'Server configuration error: missing SUPABASE_SERVICE_ROLE_KEY or URL' }), { status: 500 });
+      }
+      const adminSupabase = createClient(url, serviceRole);
       const statusHistoryEntry = { status: 'confirmed', timestamp: new Date().toISOString(), note: 'Payment verified' };
       const existing = await adminSupabase.from('orders').select('id,status,status_history').eq('tracking_code', reference).limit(1);
       let justConfirmed = false;
@@ -97,7 +100,7 @@ export async function GET(req: NextRequest) {
           .select('*')
           .limit(1);
         if (updErr) {
-          return new Response(JSON.stringify({ ...data, order_error: updErr.message }), { status: 200 });
+          return new Response(JSON.stringify({ error: `Order update failed: ${updErr.message}` }), { status: 500 });
         }
         insertedOrder = upd && upd[0] ? upd[0] : null;
       } else {
@@ -119,7 +122,7 @@ export async function GET(req: NextRequest) {
           discount_amount: discountAmt,
         }).select('*').limit(1);
         if (insertError) {
-          return new Response(JSON.stringify({ ...data, order_error: insertError.message }), { status: 200 });
+          return new Response(JSON.stringify({ error: `Order insert failed: ${insertError.message}` }), { status: 500 });
         }
         insertedOrder = inserted && inserted[0] ? inserted[0] : null;
       }
