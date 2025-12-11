@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Package, CheckCircle, Truck, MapPin, Clock, AlertCircle } from "lucide-react";
@@ -55,11 +55,16 @@ export default function TrackOrder() {
     setIsLoading(true);
     setError("");
     setSearched(true);
-    const supabase = getSupabase();
-    const { data } = await supabase.from('orders').select('*').eq('tracking_code', code.toUpperCase()).limit(1);
-    const found = (data && data[0]) || null;
-    if (found) setOrder(found as any);
-    else { setOrder(null); setError("No order found with this tracking code"); }
+    try {
+      const res = await fetch(`/api/orders/get-by-tracking?code=${encodeURIComponent(code)}`);
+      const json = await res.json();
+      const found = json?.order || null;
+      if (found) setOrder(found as any);
+      else { setOrder(null); setError("No order found with this tracking code"); }
+    } catch {
+      setOrder(null);
+      setError("Unable to query order");
+    }
     setIsLoading(false);
   }
 
@@ -82,7 +87,7 @@ export default function TrackOrder() {
           <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }} className="flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black/40" />
-              <Input placeholder="Enter tracking code (e.g. MH...)" value={trackingCode} onChange={(e) => setTrackingCode(e.target.value.toUpperCase())} className="h-14 pl-12 text-lg rounded-xl border-[#D4AF37]/20 focus:border-[#D4AF37] font-mono" />
+              <Input placeholder="Enter tracking code (e.g. MH...)" value={trackingCode} onChange={(e) => setTrackingCode(e.target.value)} className="h-14 pl-12 text-lg rounded-xl border-[#D4AF37]/20 focus:border-[#D4AF37] font-mono" />
             </div>
             <Button type="submit" disabled={isLoading} className="h-14 px-8 bg-[#D4AF37] hover:bg-[#C4A030] text-white rounded-full">{isLoading ? "Searching..." : "Track"}</Button>
           </form>

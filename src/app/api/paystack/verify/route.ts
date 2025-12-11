@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getSupabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET(req: NextRequest) {
@@ -31,12 +31,51 @@ export async function GET(req: NextRequest) {
     if (status === 'success' && reference) {
       const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) as string;
       const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY || (process.env as any).SUPABASE_SERVICE_ROLE) as string | undefined;
-      const adminSupabase = serviceRole ? createClient(url, serviceRole) : getSupabase();
-      const statusHistory = [{ status: 'confirmed', timestamp: new Date().toISOString(), note: 'Payment verified' }];
+      const adminSupabase = serviceRole ? createClient(url, serviceRole) : supabase;
+      const statusHistoryEntry = { status: 'confirmed', timestamp: new Date().toISOString(), note: 'Payment verified' };
       const existing = await adminSupabase.from('orders').select('id,status,status_history').eq('tracking_code', reference).limit(1);
+      let justConfirmed = false;
+      let allowVoucher = true;
+      let voucherCode: string | null = md?.voucher_code ? String(md.voucher_code) : null;
+      let discountAmt: number = Number(md?.discount_amount || 0);
+      if (voucherCode) {
+        try {
+          const { data: vRows } = await adminSupabase.from('vouchers').select('*').eq('code', voucherCode).limit(1);
+          const v = vRows && vRows[0];
+          if (!v || v.active === false) allowVoucher = false;
+          const email = String(md?.email || '');
+          if (email) {
+            if (v?.first_time_only) {
+              const { data: anyOrder } = await adminSupabase.from('orders').select('id').eq('email', email).limit(1);
+              if (anyOrder && anyOrder[0]) allowVoucher = false;
+            }
+            if (v?.single_use_per_customer) {
+              const { data: used } = await adminSupabase.from('orders').select('id').eq('email', email).eq('voucher_code', voucherCode).limit(1);
+              if (used && used[0]) allowVoucher = false;
+            }
+          }
+          if (allowVoucher) {
+            const type = String(v.discount_type) === 'fixed' ? 'fixed' : 'percent';
+            const val = Number(v.discount_value || 0);
+            const max = v.max_discount != null ? Number(v.max_discount) : Number.POSITIVE_INFINITY;
+            discountAmt = Math.min(type === 'percent' ? Number(md?.total || 0) * (val / 100) : val, Number(md?.total || 0), max);
+          } else {
+            voucherCode = null;
+            discountAmt = 0;
+          }
+        } catch {
+          allowVoucher = false;
+          voucherCode = null;
+          discountAmt = 0;
+        }
+      }
       if (existing.data && existing.data[0]) {
+        const prevStatus = String(existing.data[0].status || '');
         const prevHistory = Array.isArray(existing.data[0].status_history) ? existing.data[0].status_history : [];
-        const newHistory = [...prevHistory, ...statusHistory];
+        const last = prevHistory[prevHistory.length - 1];
+        const historyAlreadyConfirmed = last && String(last.status) === 'confirmed';
+        const newHistory = historyAlreadyConfirmed ? prevHistory : [...prevHistory, statusHistoryEntry];
+        justConfirmed = prevStatus !== 'confirmed';
         const { data: upd, error: updErr } = await adminSupabase
           .from('orders')
           .update({
@@ -51,6 +90,8 @@ export async function GET(req: NextRequest) {
             status: 'confirmed',
             status_history: newHistory,
             email: String(md?.email || ''),
+            voucher_code: voucherCode,
+            discount_amount: discountAmt,
           })
           .eq('tracking_code', reference)
           .select('*')
@@ -60,6 +101,7 @@ export async function GET(req: NextRequest) {
         }
         insertedOrder = upd && upd[0] ? upd[0] : null;
       } else {
+        justConfirmed = true;
         const { data: inserted, error: insertError } = await adminSupabase.from('orders').insert({
           tracking_code: reference,
           customer_name: String(md?.customer_name || ''),
@@ -71,8 +113,10 @@ export async function GET(req: NextRequest) {
           items: md?.items || [],
           total: Number(md?.total || 0),
           status: 'confirmed',
-          status_history: statusHistory,
+          status_history: [statusHistoryEntry],
           email: String(md?.email || ''),
+          voucher_code: voucherCode,
+          discount_amount: discountAmt,
         }).select('*').limit(1);
         if (insertError) {
           return new Response(JSON.stringify({ ...data, order_error: insertError.message }), { status: 200 });
@@ -81,18 +125,34 @@ export async function GET(req: NextRequest) {
       }
       const name = String(md?.customer_name || '');
       const email = String(md?.email || '');
-      if (email) {
+      if (email && justConfirmed) {
         fetch(`${new URL(req.url).origin}/api/admin/order-status-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, status: 'confirmed', tracking_code: reference, customer_name: name })
         }).catch(() => {});
       }
-      fetch(`${new URL(req.url).origin}/api/admin/new-order-alert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tracking_code: reference, total: Number(md?.total || 0), customer_name: name, created_date: new Date().toISOString() })
-      }).catch(() => {});
+      if (justConfirmed) {
+        fetch(`${new URL(req.url).origin}/api/admin/new-order-alert`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tracking_code: reference, total: Number(md?.total || 0), customer_name: name, created_date: new Date().toISOString() })
+        }).catch(() => {});
+      }
+      if (md?.voucher_code) {
+        try {
+          const vcode = String(md.voucher_code);
+          const { data: vRows } = await adminSupabase.from('vouchers').select('id,usage_count,usage_limit').eq('code', vcode).limit(1);
+          const v = vRows && vRows[0];
+          if (v) {
+            const current = Number(v.usage_count || 0);
+            const limit = v.usage_limit == null ? null : Number(v.usage_limit);
+            if (limit == null || current < limit) {
+              await adminSupabase.from('vouchers').update({ usage_count: current + 1 }).eq('id', v.id);
+            }
+          }
+        } catch {}
+      }
     }
   } catch {}
   return new Response(JSON.stringify({ ...data, order: insertedOrder }), { status: 200 });

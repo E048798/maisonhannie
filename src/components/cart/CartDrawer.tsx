@@ -42,6 +42,15 @@ export default function CartDrawer() {
                     <h4 className="font-medium text-black text-sm line-clamp-1">{item.name}</h4>
                     {item.category && <p className="text-xs text-[#D4AF37] mt-0.5">{item.category}</p>}
                     <p className="font-semibold text-black mt-1">₦{item.price.toLocaleString()}</p>
+                    {(() => {
+                      const ready = (item as any).ready_made;
+                      const val = (item as any).lead_time_value;
+                      const unit = String((item as any).lead_time_unit || 'days');
+                      if (ready === false && val) {
+                        return <p className="text-xs text-black/60 mt-0.5">Crafting: {Number(val)} {unit}</p>;
+                      }
+                      return null;
+                    })()}
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-2">
                         <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 rounded-full bg-[#E5DCC5] flex items-center justify-center hover:bg-[#D4AF37] hover:text-white transition-colors">
@@ -66,6 +75,19 @@ export default function CartDrawer() {
                 <span className="text-black/70">Subtotal</span>
                 <span className="text-xl font-bold text-black">₦{cartTotal.toLocaleString()}</span>
               </div>
+              {(() => {
+                const times = cart
+                  .map((i: any) => ({ ready: i.ready_made, val: i.lead_time_value, unit: i.lead_time_unit }))
+                  .filter((t) => t && t.ready === false && t.val);
+                if (!times.length) return null;
+                const daysTotal = times.map((t) => (String(t.unit) === 'hours' ? Number(t.val) / 24 : Number(t.val))).reduce((a, b) => Math.max(a, b), 0);
+                return (
+                  <div className="flex justify-between items-center">
+                    <span className="text-black/70">Estimated crafting time</span>
+                    <span className="text-black font-medium">{daysTotal >= 1 ? `${Math.ceil(daysTotal)} day(s)` : `${Math.ceil(daysTotal * 24)} hour(s)`}</span>
+                  </div>
+                );
+              })()}
               <p className="text-xs text-black/50 text-center">Shipping calculated at checkout</p>
               <Link href="/checkout" onClick={() => setIsCartOpen(false)} className="block">
                 <Button className="w-full h-12 bg-[#D4AF37] hover:bg-[#C4A030] text-white font-medium rounded-full">Proceed to Checkout</Button>

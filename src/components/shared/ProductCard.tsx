@@ -37,7 +37,11 @@ export default function ProductCard({ product, onAddToCart }: { product: Product
       <Link href={`/product/${product.id}`} className="relative h-64 overflow-hidden bg-[#F7F3EC] block">
         <img src={product.image} alt={product.name} className={cn("w-full h-full object-cover transition-transform duration-700", isHovered && "scale-110")} />
         <div className={cn("absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/50 to-transparent transition-all duration-300", isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4")}> 
-          <Button variant="secondary" onClick={() => onAddToCart?.(product)} className="w-full transition-colors rounded-lg">
+          <Button
+            variant="secondary"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToCart?.(product); }}
+            className="w-full transition-colors rounded-lg"
+          >
             <ShoppingBag className="w-4 h-4 mr-2" />
             Add to Cart
           </Button>

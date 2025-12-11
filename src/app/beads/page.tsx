@@ -6,7 +6,7 @@ import { ProductCardSkeleton, Shimmer } from "@/components/ui/Shimmer";
 import ReviewCard from "@/components/shared/ReviewCard";
 import Newsletter from "@/components/shared/Newsletter";
 import { beadProducts } from "@/components/data/dummyData";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/components/cart/CartContext";
 import { Button } from "@/components/ui/button";
 import { Gem, Star } from "lucide-react";
@@ -25,32 +25,36 @@ export default function BeadWorks() {
   const filters = ["all", "Bracelets", "Necklaces", "Sets"] as const;
 
   useEffect(() => {
-    const supabase = getSupabase();
     supabase.from('site_settings').select('show_beads').limit(1).then(({ data }) => {
       const s = (data && data[0]) || null;
       setBlocked(!(s?.show_beads ?? true));
       setSettingsLoaded(true);
     });
-    supabase.from("products").select("*").eq("category", "Bead Works").then(({ data }) => {
-      const products = data || [];
-      setProducts(products);
-      setIsLoading(false);
-      const ids = products.map((p: any) => p.id);
-      if (ids.length) {
-        supabase
-          .from("reviews")
-          .select("id, name, rating, comment, created_at, product_id")
-          .in("product_id", ids)
-          .order("created_at", { ascending: false })
-          .then(({ data: rdata }) => {
+    (async () => {
+      try {
+        const { data } = await supabase.from('products').select('*').eq('category', 'Bead Works');
+        const products = data || [];
+        setProducts(products);
+        setIsLoading(false);
+        const ids = products.map((p: any) => p.id);
+        if (ids.length) {
+          try {
+            const { data: rdata } = await supabase
+              .from('reviews')
+              .select('id, name, rating, comment, created_at, product_id')
+              .in('product_id', ids)
+              .order('created_at', { ascending: false });
             setReviews(rdata || []);
-            setReviewsLoading(false);
-          });
-      } else {
-        setReviews([]);
-        setReviewsLoading(false);
+          } catch {}
+          setReviewsLoading(false);
+        } else {
+          setReviews([]);
+          setReviewsLoading(false);
+        }
+      } catch {
+        setIsLoading(false);
       }
-    });
+    })();
   }, []);
 
   const filteredProducts =

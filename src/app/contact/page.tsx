@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from "react";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,6 @@ export default function Contact() {
     e.preventDefault();
     setSubmitLoading(true);
     try {
-      const supabase = getSupabase();
       const { error } = await supabase.from("contact_messages").insert({ name: formData.name, email: formData.email, phone: formData.phone || null, message: `${formData.subject}\n\n${formData.message}` , whatsapp_consent: whatsappConsent});
       if (error) throw error;
       if (formData.email) {
@@ -48,7 +47,6 @@ export default function Contact() {
   }
 
   useEffect(() => {
-    const supabase = getSupabase();
     supabase
       .from("contact_info")
       .select("*")

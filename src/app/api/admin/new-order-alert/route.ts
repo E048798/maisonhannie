@@ -6,12 +6,16 @@ export async function POST(req: Request) {
     const total = Number(body?.total || 0);
     const customer = String(body?.customer_name || '').trim();
     const created = String(body?.created_date || '').trim();
+    const recipientsEnv = process.env.RESEND_ADMIN_RECIPIENTS || '';
     const adminEmail = process.env.RESEND_ADMIN_EMAIL || process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || '';
-    if (!adminEmail) return new Response(JSON.stringify({ error: 'Missing RESEND_ADMIN_EMAIL/RESEND_FROM_EMAIL' }), { status: 500 });
+    const recipients = recipientsEnv
+      ? recipientsEnv.split(',').map((x) => x.trim()).filter(Boolean)
+      : (adminEmail ? [adminEmail] : []);
+    if (!recipients.length) return new Response(JSON.stringify({ error: 'Missing RESEND_ADMIN_RECIPIENTS/RESEND_ADMIN_EMAIL' }), { status: 500 });
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) return new Response(JSON.stringify({ error: 'Missing RESEND_API_KEY' }), { status: 500 });
     const fromName = process.env.RESEND_FROM_NAME || 'Maison Hannie';
-    const from = `${fromName} <${adminEmail}>`;
+    const from = `${fromName} <${adminEmail || (recipients[0] || 'onboarding@resend.dev')}>`;
 
     const subject = `New order ${tracking || ''}`.trim();
     const html = `
@@ -26,7 +30,7 @@ export async function POST(req: Request) {
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ from, to: [adminEmail], subject, html })
+      body: JSON.stringify({ from, to: recipients, subject, html })
     });
     if (!resp.ok) return new Response(JSON.stringify({ error: 'Failed to send alert' }), { status: 500 });
     return new Response(JSON.stringify({ ok: true }));

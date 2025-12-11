@@ -5,7 +5,7 @@ import ProductCard from "@/components/shared/ProductCard";
 import { ProductCardSkeleton, Shimmer } from "@/components/ui/Shimmer";
 import ReviewCard from "@/components/shared/ReviewCard";
 import Newsletter from "@/components/shared/Newsletter";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/components/cart/CartContext";
 import { Sparkles, Star } from "lucide-react";
 
@@ -19,24 +19,25 @@ export default function ResinWorks() {
   const [reviewsLoading, setReviewsLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = getSupabase();
     supabase.from('site_settings').select('show_resin').limit(1).then(({ data }) => {
       const s = (data && data[0]) || null;
       setBlocked(!(s?.show_resin ?? true));
       setSettingsLoaded(true);
     });
-    supabase.from("products").select("*").eq("category", "Resin Works").then(({ data }) => {
-      const products = data || [];
-      setResinProducts(products);
-      setIsLoading(false);
-      const ids = products.map((p: any) => p.id);
-      if (ids.length) {
-        supabase
-          .from("reviews")
-          .select("id, name, rating, comment, created_at, product_id")
-          .in("product_id", ids)
-          .order("created_at", { ascending: false })
-          .then(({ data: rdata }) => {
+    (async () => {
+      try {
+        const { data } = await supabase.from('products').select('*').eq('category', 'Resin Works');
+        const products = data || [];
+        setResinProducts(products);
+        setIsLoading(false);
+        const ids = products.map((p: any) => p.id);
+        if (ids.length) {
+          try {
+            const { data: rdata } = await supabase
+              .from('reviews')
+              .select('id, name, rating, comment, created_at, product_id')
+              .in('product_id', ids)
+              .order('created_at', { ascending: false });
             const r = rdata || [];
             setReviews(r);
             const stats: Record<number, { count: number; sum: number }> = {};
@@ -53,13 +54,16 @@ export default function ResinWorks() {
                 return { ...p, reviews: s?.count ?? 0, rating: avg };
               })
             );
-            setReviewsLoading(false);
-          });
-      } else {
-        setReviews([]);
-        setReviewsLoading(false);
+          } catch {}
+          setReviewsLoading(false);
+        } else {
+          setReviews([]);
+          setReviewsLoading(false);
+        }
+      } catch {
+        setIsLoading(false);
       }
-    });
+    })();
   }, []);
 
   

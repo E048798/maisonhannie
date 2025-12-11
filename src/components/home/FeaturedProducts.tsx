@@ -6,7 +6,7 @@ import { ProductCardSkeleton } from "@/components/ui/Shimmer";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/cart/CartContext";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function FeaturedProducts() {
   const [isLoading, setIsLoading] = useState(true);
@@ -14,7 +14,6 @@ export default function FeaturedProducts() {
   const [products, setProducts] = useState<any[]>([]);
 
   useEffect(() => {
-    const supabase = getSupabase();
     supabase
       .from("products")
       .select("*")

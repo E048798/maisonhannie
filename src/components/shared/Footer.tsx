@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Instagram, Facebook, Twitter, Mail, MapPin, Phone } from "lucide-react";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { Shimmer } from "@/components/ui/Shimmer";
 
 export default function Footer() {
@@ -11,7 +11,6 @@ export default function Footer() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = getSupabase();
     supabase
       .from("contact_info")
       .select("*")

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import ReviewCard from "@/components/shared/ReviewCard";
 import { Shimmer } from "@/components/ui/Shimmer";
 
@@ -11,7 +11,6 @@ export default function HomeReviews() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = getSupabase();
     supabase
       .from("reviews")
       .select("id, name, rating, comment, created_at")

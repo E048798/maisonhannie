@@ -10,9 +10,30 @@ export default function BookingForm() {
   const [submitted, setSubmitted] = useState(false);
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", eventType: "", guests: "", date: "", message: "" });
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
+    try {
+      const resp = await fetch('/api/catering/inquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          eventType: formData.eventType,
+          guests: formData.guests,
+          date: formData.date,
+          message: formData.message,
+        })
+      });
+      if (resp.ok) {
+        setSubmitted(true);
+      } else {
+        alert('Unable to submit inquiry at this time');
+      }
+    } catch {
+      alert('Network error submitting inquiry');
+    }
   }
 
   if (submitted) {

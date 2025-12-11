@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import BlogCard from "@/components/blog/BlogCard";
 import { BlogCardSkeleton } from "@/components/ui/Shimmer";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import Newsletter from "@/components/shared/Newsletter";
 import { Button } from "@/components/ui/button";
 import { BookOpen } from "lucide-react";
@@ -20,7 +20,6 @@ export default function Blog() {
   const filteredPosts = activeCategory === "all" ? posts : posts.filter((p) => p.category === activeCategory);
 
   useEffect(() => {
-    const supabase = getSupabase();
     supabase.from('site_settings').select('show_blog').limit(1).then(({ data }) => {
       const s = (data && data[0]) || null;
       setBlocked(!(s?.show_blog ?? true));

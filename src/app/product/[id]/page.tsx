@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/components/cart/CartContext";
 import { useFavorites } from "@/components/favorites/FavoritesContext";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,6 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     setProductLoading(true);
-    const supabase = getSupabase();
     supabase.from("products").select("*").eq("id", id).then(({ data }) => {
       const prod = (data && data[0]) || null;
       setProduct(prod as any);
@@ -60,7 +59,6 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     setReviewsLoading(true);
-    const supabase = getSupabase();
     supabase
       .from("reviews")
       .select("id, name, rating, comment, created_at, product_id")
@@ -206,6 +204,19 @@ export default function ProductDetailPage() {
               <span className="text-3xl font-bold text-black">₦{product.price.toLocaleString()}</span>
               {product.originalPrice && <span className="text-xl text-black/40 line-through">₦{product.originalPrice.toLocaleString()}</span>}
             </div>
+            {(() => {
+              const p: any = product as any;
+              if (p.ready_made === false && p.lead_time_value) {
+                const val = Number(p.lead_time_value);
+                const unit = String(p.lead_time_unit || 'days');
+                return (
+                  <div className="mb-6 p-4 bg-[#F7F3EC] rounded-xl">
+                    <p className="text-sm text-black/70">Crafting time: <span className="font-medium text-black">{val} {unit}</span></p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <p className="text-black/70 leading-relaxed mb-8">{product.description}</p>
 
@@ -318,7 +329,7 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/60" onClick={() => setIsMediaModalOpen(false)} />
           <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="relative w-full max-w-4xl bg-black rounded-2xl overflow-hidden shadow-xl">
+            <div className="relative w-full max-w-4xl bg-black rounded-2xl shadow-xl max-h-[85vh] overflow-auto">
               <button onClick={() => setIsMediaModalOpen(false)} className="absolute right-3 top-3 z-10 p-2 rounded-full bg-white/20 hover:bg-white/30">
                 <X className="w-5 h-5 text-white" />
               </button>

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 
 const categories = [
   {
@@ -45,7 +45,6 @@ export default function CategoryShowcase() {
   const [beadsCount, setBeadsCount] = useState<number | null>(null);
   const [cateringCount, setCateringCount] = useState<number | null>(null);
   useEffect(() => {
-    const supabase = getSupabase();
     Promise.all([
       supabase.from("products").select("*", { count: "exact", head: true }).eq("category", "Fashion Design"),
       supabase.from("products").select("*", { count: "exact", head: true }).eq("category", "Resin Works"),

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import StarRating from "@/components/shared/StarRating";
@@ -15,7 +15,6 @@ export default function RatingModal({ isOpen, onClose, product }: { isOpen: bool
   const [allowPublic, setAllowPublic] = useState<boolean>(true);
 
   useEffect(() => {
-    const supabase = getSupabase();
     supabase.from("site_settings").select("allow_public_reviews").limit(1).then(({ data }) => {
       if (data && data.length) setAllowPublic(!!data[0].allow_public_reviews);
     });
@@ -30,14 +29,12 @@ export default function RatingModal({ isOpen, onClose, product }: { isOpen: bool
       let verified = false;
       const code = trackingCodeInput.trim().toUpperCase();
       if (code) {
-        const supabase = getSupabase();
         const { data } = await supabase.from('orders').select('items').eq('tracking_code', code).limit(1);
         const order = data && data[0];
         if (order && Array.isArray(order.items)) {
           verified = !!order.items.find((it: any) => Number(it?.id) === product.id);
         }
       }
-      const supabase = getSupabase();
       await supabase.from("reviews").insert({ product_id: pid, name: "Anonymous", rating, comment, verified, tracking_code: code || null });
       setSubmitted(true);
     }

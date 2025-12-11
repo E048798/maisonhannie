@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getSupabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Package, FileText, Eye, EyeOff, Star, Trash2, Plus, Save, X, Mail, Bell, ShoppingCart, Loader2, LogOut, Pencil, ImagePlus, Video } from 'lucide-react';
+import { Settings, Package, FileText, Eye, EyeOff, Star, Trash2, Plus, Save, X, Mail, Bell, ShoppingCart, Loader2, LogOut, Pencil, ImagePlus, Video, Tag, Power, Inbox, Send } from 'lucide-react';
 import { allProducts, blogPosts } from '@/components/data/dummyData';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +26,6 @@ export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<{ full_name?: string; email?: string } | null>(null);
-  const supabase = getSupabase();
 
   useEffect(() => {
     checkAuth();
@@ -68,14 +67,114 @@ export default function Admin() {
 
   const [orders, setOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderPage, setOrderPage] = useState(1);
+  const [orderLimit, setOrderLimit] = useState(10);
+  const [orderTotal, setOrderTotal] = useState(0);
+  const [orderSearch, setOrderSearch] = useState('');
+
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [newOrder, setNewOrder] = useState<any>({ name: '', email: '', phone: '', address: '', city: '', state: '' });
+  const [newOrderItems, setNewOrderItems] = useState<any[]>([]);
+  const [editingOrderId, setEditingOrderId] = useState<number | string | null>(null);
+  const [editingOrder, setEditingOrder] = useState<any | null>(null);
+  const [viewOrder, setViewOrder] = useState<any | null>(null);
+
+  function addNewOrderItem() {
+    setNewOrderItems((prev: any[]) => [...prev, { name: '', price: '', quantity: 1 }]);
+  }
+
+  function openEditOrder(order: any) {
+    setEditingOrderId(order.id);
+    setEditingOrder({
+      name: order.customer_name || '',
+      email: order.email || '',
+      phone: order.phone || '',
+      address: order.address || '',
+      city: order.city || '',
+      state: order.state || '',
+    });
+  }
+
+  function openViewOrder(order: any) {
+    setViewOrder(order);
+  }
+
+  async function saveEditOrder() {
+    if (!editingOrderId || !editingOrder) return;
+    const updates: any = {
+      customer_name: editingOrder.name || null,
+      email: editingOrder.email || null,
+      phone: editingOrder.phone || null,
+      address: editingOrder.address || null,
+      city: editingOrder.city || null,
+      state: editingOrder.state || null,
+    };
+    const resp = await fetch('/api/admin/orders/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editingOrderId, updates })
+    });
+    if (resp.ok) {
+      setOrders((prev) => prev.map((o) => (o.id === editingOrderId ? { ...o, ...updates } : o)));
+      setEditingOrderId(null);
+      setEditingOrder(null);
+    }
+  }
+
+  async function deleteOrder(order: any) {
+    const resp = await fetch('/api/admin/orders/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: order.id })
+    });
+    if (resp.ok) {
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+    }
+  }
+
+  async function createOrderAdmin() {
+    const reference = `ADM-${Date.now()}`;
+    const items = newOrderItems.map((it) => ({ name: it.name, price: Number(it.price || 0), quantity: Number(it.quantity || 1) }));
+    const total = items.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+    const payload = {
+      reference,
+      customer_name: newOrder.name,
+      phone: newOrder.phone || null,
+      address: newOrder.address || null,
+      landmark: null,
+      city: newOrder.city || null,
+      state: newOrder.state || null,
+      items,
+      total,
+      email: newOrder.email || null,
+    };
+    const resp = await fetch('/api/orders/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (resp.ok) {
+      setShowCreateOrder(false);
+      setNewOrder({ name: '', email: '', phone: '', address: '', city: '', state: '' });
+      setNewOrderItems([]);
+      setOrderPage(1);
+      try {
+        const r = await fetch(`/api/admin/orders/list?page=1&limit=${orderLimit}`);
+        const j = await r.json();
+        setOrders(Array.isArray(j?.orders) ? j.orders : []);
+        setOrderTotal(Number(j?.total || 0));
+      } catch {}
+    }
+  }
 
   useEffect(() => {
     async function loadOrders() {
       if (!isAuthenticated) return;
       setOrdersLoading(true);
       try { await fetch('/api/admin/cleanup-pending', { method: 'POST' }); } catch {}
-      const { data } = await supabase.from('orders').select('*').order('created_date', { ascending: false });
-      const arr = data || [];
+      let arr: any[] = [];
+      try {
+        const resp = await fetch(`/api/admin/orders/list?page=${orderPage}&limit=${orderLimit}`);
+        const json = await resp.json();
+        arr = Array.isArray(json?.orders) ? json.orders : [];
+        setOrderTotal(Number(json?.total || 0));
+      } catch {}
       setOrders(arr);
       setOrdersLoading(false);
       try {
@@ -101,11 +200,11 @@ export default function Admin() {
       } catch {}
     }
     loadOrders();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, orderPage, orderLimit]);
 
   async function updateOrderStatus(order: any, newStatus: string) {
     const newHistory = [...(order.status_history || []), { status: newStatus, timestamp: new Date().toISOString(), note: `Status updated to ${newStatus}` }];
-    await supabase.from('orders').update({ status: newStatus, status_history: newHistory }).eq('id', order.id);
+    await fetch('/api/admin/orders/update-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: order.id, status: newStatus, status_history: newHistory }) });
     setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: newStatus, status_history: newHistory } : o)));
     try {
       if (settings.emailNotifications && order.email) {
@@ -210,12 +309,34 @@ export default function Admin() {
 
   const [products, setProducts] = useState<ProductAdmin[]>(allProducts.map((p) => ({ ...(p as any), visible: true })));
   const [blogs, setBlogs] = useState<BlogAdmin[]>(blogPosts.map((b) => ({ ...(b as any), visible: true })));
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [inqPage, setInqPage] = useState(1);
+  const [inqLimit, setInqLimit] = useState(10);
+  const [inqTotal, setInqTotal] = useState(0);
+  const [inquirySearch, setInquirySearch] = useState('');
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailDraft, setEmailDraft] = useState({ to: '', subject: '', html: '' });
+  const [viewInquiry, setViewInquiry] = useState<any | null>(null);
+  const [editingBlogId, setEditingBlogId] = useState<number | string | null>(null);
+  const [editingBlog, setEditingBlog] = useState<any | null>(null);
+  const [vouchers, setVouchers] = useState<any[]>([]);
+  const [showAddVoucher, setShowAddVoucher] = useState(false);
+  const [newVoucher, setNewVoucher] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order_amount: '', start_date: '', end_date: '', usage_limit: '', active: true, first_time_only: false, single_use_per_customer: false, applicable_categories: '', max_discount: '', note: '' });
+  const [editingVoucherId, setEditingVoucherId] = useState<number | string | null>(null);
+  const [editingVoucher, setEditingVoucher] = useState<any | null>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddBlog, setShowAddBlog] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'Resin Works', description: '', image: '', featured: false });
+  const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'Resin Works', description: '', image: '', featured: false, ready_made: true, lead_time_value: '', lead_time_unit: 'days' });
   const [newBlog, setNewBlog] = useState({ title: '', excerpt: '', category: 'Behind the Scenes', image: '', author: 'Sarah Hannie' });
-  const [uploadingMain, setUploadingMain] = useState(false);
-  const [uploadingExtra, setUploadingExtra] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [blogSearch, setBlogSearch] = useState('');
+  const [voucherSearch, setVoucherSearch] = useState('');
+
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; message: string; onConfirm: () => void } | null>(null);
+  function openConfirm(message: string, onConfirm: () => void) {
+    setConfirmDialog({ open: true, message, onConfirm });
+  }
 
   const [contactInfo, setContactInfo] = useState<any>({ address: '', phone: '', email: '', instagram_url: '', facebook_url: '', twitter_url: '' });
   const [contactLoaded, setContactLoaded] = useState(false);
@@ -227,6 +348,9 @@ export default function Admin() {
   const [businessHourSaving, setBusinessHourSaving] = useState(false);
   const [addProductSaving, setAddProductSaving] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  const [uploadingCoverNew, setUploadingCoverNew] = useState(false);
+  const [uploadingImagesNew, setUploadingImagesNew] = useState(false);
+  const [uploadingVideosNew, setUploadingVideosNew] = useState(false);
 
   async function toggleProductVisibility(id: number | string) {
     const target = products.find((p) => p.id === id);
@@ -243,7 +367,8 @@ export default function Admin() {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, featured: !p.featured } : p)));
   }
 
-  function deleteProduct(id: number | string) {
+  async function deleteProduct(id: number | string) {
+    await supabase.from('products').delete().eq('id', Number(id));
     setProducts((prev) => prev.filter((p) => p.id !== id));
   }
 
@@ -259,13 +384,16 @@ export default function Admin() {
       featured: newProduct.featured || false,
       images: (newProduct as any).images || [],
       videos: (newProduct as any).videos || [],
+      ready_made: !!(newProduct as any).ready_made,
+      lead_time_value: (newProduct as any).lead_time_value ? Number((newProduct as any).lead_time_value) : null,
+      lead_time_unit: (newProduct as any).lead_time_value ? String((newProduct as any).lead_time_unit || 'days') : null,
     } as any;
     setAddProductSaving(true);
     const { data, error } = await supabase.from('products').insert(payload).select('*').limit(1);
     if (!error) {
       const inserted = data && data[0] ? data[0] : { id: `new_${Date.now()}`, ...payload };
       setProducts((prev) => [...prev, { ...(inserted as any), visible: true }]);
-      setNewProduct({ name: '', price: '', category: 'Resin Works', description: '', image: '', featured: false });
+      setNewProduct({ name: '', price: '', category: 'Resin Works', description: '', image: '', featured: false, ready_made: true, lead_time_value: '', lead_time_unit: 'days' });
       setShowAddProduct(false);
     }
     setAddProductSaving(false);
@@ -273,6 +401,9 @@ export default function Admin() {
 
   const [editingProductId, setEditingProductId] = useState<number | string | null>(null);
   const [editingData, setEditingData] = useState<any | null>(null);
+  const [uploadingCoverEdit, setUploadingCoverEdit] = useState(false);
+  const [uploadingImagesEdit, setUploadingImagesEdit] = useState(false);
+  const [uploadingVideosEdit, setUploadingVideosEdit] = useState(false);
 
   function openEditProduct(p: ProductAdmin) {
     setEditingProductId(p.id);
@@ -285,6 +416,9 @@ export default function Admin() {
       featured: !!p.featured,
       images: p.images || [],
       videos: p.videos || [],
+      ready_made: (p as any).ready_made ?? true,
+      lead_time_value: (p as any).lead_time_value ?? '',
+      lead_time_unit: (p as any).lead_time_unit ?? 'days',
     });
   }
 
@@ -299,6 +433,9 @@ export default function Admin() {
       featured: !!editingData.featured,
       images: Array.isArray(editingData.images) ? editingData.images : [],
       videos: Array.isArray(editingData.videos) ? editingData.videos : [],
+      ready_made: !!(editingData as any).ready_made,
+      lead_time_value: (editingData as any).lead_time_value ? Number((editingData as any).lead_time_value) : null,
+      lead_time_unit: (editingData as any).lead_time_value ? String((editingData as any).lead_time_unit || 'days') : null,
     };
     setEditSaving(true);
     await supabase.from('products').update(payload).eq('id', Number(editingProductId));
@@ -326,34 +463,100 @@ export default function Admin() {
     } catch { return ''; }
   }
 
-  function toggleBlogVisibility(id: number | string) {
-    setBlogs((prev) => prev.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)));
+  async function handleUploadCoverNew(e: any) {
+    const f = e.target.files && (e.target.files[0] as File);
+    if (!f) return;
+    setUploadingCoverNew(true);
+    const url = await uploadFile(f, 'products');
+    if (url) setNewProduct((np) => ({ ...np, image: url }));
+    setUploadingCoverNew(false);
+    e.target.value = '';
   }
 
-  function deleteBlog(id: number | string) {
-    setBlogs((prev) => prev.filter((b) => b.id !== id));
-  }
-
-  function addBlog() {
-    if (newBlog.title && newBlog.excerpt) {
-      setBlogs((prev) => [
-        ...prev,
-        {
-          ...newBlog,
-          id: `blog_${Date.now()}`,
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-          likes: 0,
-          hearts: 0,
-          claps: 0,
-          views: 0,
-          comments: [],
-          visible: true,
-        },
-      ] as BlogAdmin[]);
-      setNewBlog({ title: '', excerpt: '', category: 'Behind the Scenes', image: '', author: 'Sarah Hannie' });
-      setShowAddBlog(false);
+  async function handleUploadImagesNew(e: any) {
+    const files = e.target.files ? (Array.from(e.target.files as FileList) as File[]) : [];
+    if (!files.length) return;
+    setUploadingImagesNew(true);
+    const uploaded: string[] = [];
+    for (const file of files) {
+      const url = await uploadFile(file, 'products');
+      if (url) uploaded.push(url);
     }
+    setNewProduct((np) => ({ ...(np as any), images: [ ...((np as any).images || []), ...uploaded ] }));
+    setUploadingImagesNew(false);
+    e.target.value = '';
   }
+
+  async function handleUploadVideosNew(e: any) {
+    const files = e.target.files ? (Array.from(e.target.files as FileList) as File[]) : [];
+    if (!files.length) return;
+    setUploadingVideosNew(true);
+    const uploaded: string[] = [];
+    for (const file of files) {
+      const url = await uploadFile(file, 'products');
+      if (url) uploaded.push(url);
+    }
+    setNewProduct((np) => ({ ...(np as any), videos: [ ...((np as any).videos || []), ...uploaded ] }));
+    setUploadingVideosNew(false);
+    e.target.value = '';
+  }
+
+  async function handleUploadCoverEdit(e: any) {
+    const f = e.target.files && (e.target.files[0] as File);
+    if (!f) return;
+    setUploadingCoverEdit(true);
+    const url = await uploadFile(f, 'products');
+    if (url) setEditingData((ed: any) => ({ ...(ed || {}), image: url }));
+    setUploadingCoverEdit(false);
+    e.target.value = '';
+  }
+
+  async function handleUploadImagesEdit(e: any) {
+    const files = e.target.files ? (Array.from(e.target.files as FileList) as File[]) : [];
+    if (!files.length) return;
+    setUploadingImagesEdit(true);
+    const uploaded: string[] = [];
+    for (const file of files) {
+      const url = await uploadFile(file, 'products');
+      if (url) uploaded.push(url);
+    }
+    setEditingData((ed: any) => ({ ...(ed || {}), images: [ ...(Array.isArray(ed?.images) ? ed.images : []), ...uploaded ] }));
+    setUploadingImagesEdit(false);
+    e.target.value = '';
+  }
+
+  async function handleUploadVideosEdit(e: any) {
+    const files = e.target.files ? (Array.from(e.target.files as FileList) as File[]) : [];
+    if (!files.length) return;
+    setUploadingVideosEdit(true);
+    const uploaded: string[] = [];
+    for (const file of files) {
+      const url = await uploadFile(file, 'products');
+      if (url) uploaded.push(url);
+    }
+    setEditingData((ed: any) => ({ ...(ed || {}), videos: [ ...(Array.isArray(ed?.videos) ? ed.videos : []), ...uploaded ] }));
+    setUploadingVideosEdit(false);
+    e.target.value = '';
+  }
+
+function toggleBlogVisibility(id: number | string) {
+  setBlogs((prev) => prev.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)));
+}
+
+async function deleteBlog(id: number | string) {
+  try { await supabase.from('blog_posts').delete().eq('id', id); } catch {}
+  setBlogs((prev) => prev.filter((b) => b.id !== id));
+}
+
+async function addBlog() {
+  if (!newBlog.title || !newBlog.excerpt) return;
+  const payload: any = { title: newBlog.title, excerpt: newBlog.excerpt, category: newBlog.category || null, image: newBlog.image || null, author: newBlog.author || null, date: new Date().toLocaleDateString(), comments: [] };
+  const { data } = await supabase.from('blog_posts').insert(payload).select('*').limit(1);
+  const inserted = data && data[0] ? data[0] : { ...payload, id: `blog_${Date.now()}` };
+  setBlogs((prev) => [...prev, { ...(inserted as any), visible: true }]);
+  setNewBlog({ title: '', excerpt: '', category: 'Behind the Scenes', image: '', author: 'Sarah Hannie' });
+  setShowAddBlog(false);
+}
 
   useEffect(() => {
     async function loadContact() {
@@ -378,6 +581,43 @@ export default function Admin() {
     loadProducts();
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    async function loadVouchers() {
+      if (!isAuthenticated) return;
+      const { data } = await supabase.from('vouchers').select('*').order('created_at', { ascending: false });
+      setVouchers(data || []);
+    }
+    loadVouchers();
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    async function loadBlogs() {
+      if (!isAuthenticated) return;
+      const { data } = await supabase.from('blog_posts').select('*').order('id', { ascending: true });
+      const rows = data || [];
+      setBlogs(rows.map((b: any) => ({ ...(b as any), visible: true })));
+    }
+    loadBlogs();
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    async function loadInquiries() {
+      if (!isAuthenticated) return;
+      setInquiriesLoading(true);
+      const from = (inqPage - 1) * inqLimit;
+      const to = from + inqLimit - 1;
+      const { data, count } = await supabase
+        .from('catering_inquiries')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      setInquiries(data || []);
+      setInqTotal(Number(count || 0));
+      setInquiriesLoading(false);
+    }
+    loadInquiries();
+  }, [isAuthenticated, inqPage, inqLimit]);
+
   async function saveContactInfoAdmin() {
     setContactSaving(true);
     const payload = {
@@ -395,6 +635,97 @@ export default function Admin() {
       if (data && data[0]) setContactInfo(data[0]);
     }
     setContactSaving(false);
+  }
+
+  async function addVoucher() {
+    const payload: any = {
+      code: newVoucher.code.trim(),
+      discount_type: newVoucher.discount_type,
+      discount_value: Number(newVoucher.discount_value) || 0,
+      min_order_amount: newVoucher.min_order_amount ? Number(newVoucher.min_order_amount) : null,
+      start_date: newVoucher.start_date || null,
+      end_date: newVoucher.end_date || null,
+      usage_limit: newVoucher.usage_limit ? Number(newVoucher.usage_limit) : null,
+      active: !!newVoucher.active,
+      first_time_only: !!newVoucher.first_time_only,
+      single_use_per_customer: !!newVoucher.single_use_per_customer,
+      applicable_categories: newVoucher.applicable_categories ? newVoucher.applicable_categories.split(',').map((s) => s.trim()).filter(Boolean) : null,
+      max_discount: newVoucher.max_discount ? Number(newVoucher.max_discount) : null,
+      note: newVoucher.note || null,
+    };
+    if (!payload.code || !payload.discount_value) return;
+    const { data, error } = await supabase.from('vouchers').insert(payload).select('*').limit(1);
+    if (!error) {
+      const inserted = data && data[0] ? data[0] : payload;
+      setVouchers((prev) => [inserted, ...prev]);
+      setShowAddVoucher(false);
+      setNewVoucher({ code: '', discount_type: 'percent', discount_value: '', min_order_amount: '', start_date: '', end_date: '', usage_limit: '', active: true, first_time_only: false, single_use_per_customer: false, applicable_categories: '', max_discount: '', note: '' });
+    }
+  }
+
+  async function toggleVoucherActive(v: any) {
+    const next = !v.active;
+    const { data, error } = await supabase.from('vouchers').update({ active: next }).eq('id', v.id).select('*').limit(1);
+    if (!error) {
+      const updated = data && data[0] ? data[0] : { ...v, active: next };
+      setVouchers((prev) => prev.map((x) => (x.id === v.id ? updated : x)));
+    }
+  }
+
+  function openEditVoucher(v: any) {
+    setEditingVoucherId(v.id);
+    setEditingVoucher({
+      code: v.code,
+      discount_type: v.discount_type,
+      discount_value: v.discount_value,
+      min_order_amount: v.min_order_amount || '',
+      start_date: v.start_date ? String(v.start_date).slice(0, 10) : '',
+      end_date: v.end_date ? String(v.end_date).slice(0, 10) : '',
+      usage_limit: v.usage_limit || '',
+      active: !!v.active,
+      first_time_only: !!v.first_time_only,
+      single_use_per_customer: !!v.single_use_per_customer,
+      applicable_categories: Array.isArray(v.applicable_categories) ? v.applicable_categories.join(', ') : '',
+      max_discount: v.max_discount || '',
+      note: v.note || '',
+    });
+  }
+
+  async function saveEditVoucher() {
+    if (!editingVoucherId || !editingVoucher) return;
+    const payload: any = {
+      code: editingVoucher.code.trim(),
+      discount_type: editingVoucher.discount_type,
+      discount_value: Number(editingVoucher.discount_value) || 0,
+      min_order_amount: editingVoucher.min_order_amount ? Number(editingVoucher.min_order_amount) : null,
+      start_date: editingVoucher.start_date || null,
+      end_date: editingVoucher.end_date || null,
+      usage_limit: editingVoucher.usage_limit ? Number(editingVoucher.usage_limit) : null,
+      active: !!editingVoucher.active,
+      first_time_only: !!editingVoucher.first_time_only,
+      single_use_per_customer: !!editingVoucher.single_use_per_customer,
+      applicable_categories: editingVoucher.applicable_categories ? editingVoucher.applicable_categories.split(',').map((s: string) => s.trim()).filter(Boolean) : null,
+      max_discount: editingVoucher.max_discount ? Number(editingVoucher.max_discount) : null,
+      note: editingVoucher.note || null,
+    };
+    const { error } = await supabase.from('vouchers').update(payload).eq('id', editingVoucherId);
+    if (!error) {
+      setVouchers((prev) => prev.map((x) => (x.id === editingVoucherId ? { ...x, ...payload } : x)));
+      setEditingVoucherId(null);
+      setEditingVoucher(null);
+    }
+  }
+
+  async function deleteVoucher(v: any) {
+    const { error } = await supabase.from('vouchers').delete().eq('id', v.id);
+    if (!error) {
+      setVouchers((prev) => prev.filter((x) => x.id !== v.id));
+    }
+  }
+
+  async function deleteInquiryRow(q: any) {
+    await supabase.from('catering_inquiries').delete().eq('id', q.id);
+    setInquiries((prev) => prev.filter((x) => x.id !== q.id));
   }
 
   function editBusinessHour(id: number | string) {
@@ -480,6 +811,12 @@ export default function Admin() {
             <TabsTrigger value="contact" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <Mail className="w-4 h-4 mr-2" /> Contact
             </TabsTrigger>
+            <TabsTrigger value="inquiries" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+              <Inbox className="w-4 h-4 mr-2" /> Inquiries
+            </TabsTrigger>
+            <TabsTrigger value="vouchers" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+              <Tag className="w-4 h-4 mr-2" /> Vouchers
+            </TabsTrigger>
             <TabsTrigger value="settings" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <Settings className="w-4 h-4 mr-2" /> Settings
             </TabsTrigger>
@@ -487,9 +824,21 @@ export default function Admin() {
 
           <TabsContent value="orders">
             <Card>
-              <CardHeader>
-                <CardTitle>Order Management</CardTitle>
-              </CardHeader>
+      <CardHeader className="flex items-center justify-between">
+        <CardTitle>Order Management</CardTitle>
+        <div className="flex items-center gap-2">
+          <Input className="w-64" placeholder="Search orders" value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} />
+          <Select value={String(orderLimit)} onValueChange={(v) => setOrderLimit(Number(v))}>
+            <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => setShowCreateOrder(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white"><Plus className="w-4 h-4 mr-2" /> Create Order</Button>
+        </div>
+      </CardHeader>
               <CardContent>
                 {ordersLoading ? (
                   <div className="flex justify-center py-8">
@@ -498,111 +847,366 @@ export default function Admin() {
                 ) : orders.length === 0 ? (
                   <div className="text-center py-8 text-black/60">No orders yet</div>
                 ) : (
-                  <div className="space-y-8">
-                    <div>
-                      <h3 className="text-black font-semibold mb-3">Active Orders</h3>
-                      <div className="space-y-4">
-                        {orders.filter((o) => o.status !== 'pending').map((order) => (
-                          <div key={order.id} className={cn('p-4 bg-white rounded-xl border')}>
-                            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                              <div>
-                                <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
-                                <p className="font-medium text-black">{order.customer_name}</p>
-                                <p className="text-sm text-black/60">{order.phone}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-bold text-black">₦{order.total?.toLocaleString()}</p>
-                                <p className="text-xs text-black/50">{new Date(order.created_date).toLocaleDateString()}</p>
-                              </div>
+                  <>
+                    <div className="space-y-4">
+                    {orders.filter((order) => {
+                      const q = orderSearch.toLowerCase().trim();
+                      if (!q) return true;
+                      const fields = [order.customer_name, order.tracking_code, order.phone, order.email, order.address, order.city, order.state];
+                      return fields.some((v: any) => String(v || '').toLowerCase().includes(q));
+                    }).map((order) => (
+                        <div key={order.id} className={cn('p-4 bg-white rounded-xl border', order.status === 'pending' ? 'border-yellow-300 bg-yellow-50' : '')}>
+                          <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                            <div>
+                              <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
+                              <p className="font-medium text-black">{order.customer_name}</p>
+                              <p className="text-sm text-black/60">{order.phone}</p>
                             </div>
-                            <div className="mb-4 p-3 bg-[#F7F3EC] rounded-lg text-sm">
-                              <p className="text-black/70">{order.address}, {order.landmark && `${order.landmark}, `}{order.city}, {order.state}</p>
+                            <div className="text-right">
+                              <p className="font-bold text-black">₦{order.total?.toLocaleString()}</p>
+                              <p className="text-xs text-black/50">{new Date(order.created_date).toLocaleDateString()}</p>
                             </div>
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex flex-wrap gap-2">
-                                {order.items?.slice(0, 2).map((item: any, i: number) => (
-                                  <img key={i} src={item.image} alt={item.name} className="w-10 h-10 rounded object-cover" />
+                          </div>
+
+                          <div className="mb-4 p-3 bg-[#F7F3EC] rounded-lg text-sm">
+                            <p className="text-black/70">
+                              {order.address}, {order.landmark && `${order.landmark}, `}
+                              {order.city}, {order.state}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap gap-2">
+                              {order.items?.slice(0, 2).map((item: any, i: number) => (
+                                <img key={i} src={item.image} alt={item.name} className="w-10 h-10 rounded object-cover" />
+                              ))}
+                              {order.items?.length > 2 && (
+                                <span className="w-10 h-10 rounded bg-[#E5DCC5] flex items-center justify-center text-xs font-medium">+{order.items.length - 2}</span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {order.status === 'pending' && <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>}
+                            </div>
+                            <Select value={order.status} onValueChange={(value) => updateOrderStatus(order, value)}>
+                              <SelectTrigger className="w-44">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STATUS_OPTIONS.map((status) => (
+                                  <SelectItem key={status.value} value={status.value}>
+                                    <span className={cn('px-2 py-0.5 rounded text-xs', status.color)}>{status.label}</span>
+                                  </SelectItem>
                                 ))}
-                                {order.items?.length > 2 && (
-                                  <span className="w-10 h-10 rounded bg-[#E5DCC5] flex items-center justify-center text-xs font-medium">+{order.items.length - 2}</span>
-                                )}
-                              </div>
-                              <Select value={order.status} onValueChange={(value) => updateOrderStatus(order, value)}>
-                                <SelectTrigger className="w-44">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {STATUS_OPTIONS.map((status) => (
-                                    <SelectItem key={status.value} value={status.value}>
-                                      <span className={cn('px-2 py-0.5 rounded text-xs', status.color)}>{status.label}</span>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              </SelectContent>
+                            </Select>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => openViewOrder(order)} className="p-2 rounded-lg hover:bg-gray-100"><Eye className="w-4 h-4" /></button>
+                              <button onClick={() => openEditOrder(order)} className="p-2 rounded-lg hover:bg-gray-100"><Pencil className="w-4 h-4" /></button>
+                              <button onClick={() => openConfirm(`Delete order ${order.tracking_code}?`, () => deleteOrder(order))} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4" /></button>
                             </div>
                           </div>
-                        ))}
-                        {orders.filter((o) => o.status !== 'pending').length === 0 && (
-                          <div className="text-black/60">No active orders</div>
-                        )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between pt-4">
+                      <p className="text-sm text-black/60">Page {orderPage} of {Math.max(1, Math.ceil(orderTotal / orderLimit))}</p>
+                      <div className="flex items-center gap-2">
+                        <Button onClick={() => setOrderPage((p) => Math.max(1, p - 1))} variant="outline">Prev</Button>
+                        <Button onClick={() => setOrderPage((p) => (p * orderLimit < orderTotal ? p + 1 : p))} variant="outline">Next</Button>
                       </div>
                     </div>
-                    <div>
-                      <h3 className="text-black font-semibold mb-3">Pending Orders</h3>
-                      <div className="space-y-4">
-                        {orders.filter((o) => o.status === 'pending').map((order) => (
-                          <div key={order.id} className={cn('p-4 rounded-xl border border-yellow-300 bg-yellow-50')}>
-                            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                              <div>
-                                <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
-                                <p className="font-medium text-black">{order.customer_name}</p>
-                                <p className="text-sm text-black/60">{order.phone}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-bold text-black">₦{order.total?.toLocaleString()}</p>
-                                <p className="text-xs text-black/50">{new Date(order.created_date).toLocaleDateString()}</p>
-                              </div>
-                            </div>
-                            <div className="mb-4 p-3 bg-[#F7F3EC] rounded-lg text-sm">
-                              <p className="text-black/70">{order.address}, {order.landmark && `${order.landmark}, `}{order.city}, {order.state}</p>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
-                              </div>
-                              <Select value={order.status} onValueChange={(value) => updateOrderStatus(order, value)}>
-                                <SelectTrigger className="w-44">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {STATUS_OPTIONS.map((status) => (
-                                    <SelectItem key={status.value} value={status.value}>
-                                      <span className={cn('px-2 py-0.5 rounded text-xs', status.color)}>{status.label}</span>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        ))}
-                        {orders.filter((o) => o.status === 'pending').length === 0 && (
-                          <div className="text-black/60">No pending orders</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  </>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
+          {showEmailModal && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
+                <h3 className="text-xl font-semibold text-black mb-4">Send Email</h3>
+                <Input placeholder="To" value={emailDraft.to} onChange={(e) => setEmailDraft({ ...emailDraft, to: e.target.value })} className="mb-3" />
+                <Input placeholder="Subject" value={emailDraft.subject} onChange={(e) => setEmailDraft({ ...emailDraft, subject: e.target.value })} className="mb-3" />
+                <Textarea placeholder="Message (HTML supported)" value={emailDraft.html} onChange={(e) => setEmailDraft({ ...emailDraft, html: e.target.value })} className="mb-4 min-h-[160px]" />
+                <div className="flex items-center gap-2">
+                  <Button onClick={sendInquiryEmail} className="bg-green-600 hover:bg-green-700 text-white"><Send className="w-4 h-4 mr-2" /> Send</Button>
+                  <Button onClick={() => setShowEmailModal(false)} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+                </div>
+              </div>
+            </div>
+          )}
+          {viewInquiry && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
+                <h3 className="text-xl font-semibold text-black mb-4">Inquiry Details</h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="font-medium">Name:</span> {viewInquiry.name}</p>
+                  <p><span className="font-medium">Email:</span> {viewInquiry.email}</p>
+                  <p><span className="font-medium">Phone:</span> {viewInquiry.phone || '-'}</p>
+                  <p><span className="font-medium">Event Type:</span> {viewInquiry.event_type || '-'}</p>
+                  <p><span className="font-medium">Guests:</span> {viewInquiry.guests || '-'}</p>
+                  <p><span className="font-medium">Event Date:</span> {viewInquiry.event_date || '-'}</p>
+                  <p><span className="font-medium">Message:</span> {viewInquiry.message || '-'}</p>
+                </div>
+                <div className="flex items-center gap-2 mt-4">
+                  <Button onClick={() => setViewInquiry(null)} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Close</Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <TabsContent value="inquiries">
+            <Card>
+              <CardHeader className="flex items-center justify-between">
+                <CardTitle>Catering Inquiries</CardTitle>
+                <Input className="w-64" placeholder="Search inquiries" value={inquirySearch} onChange={(e) => setInquirySearch(e.target.value)} />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {inquiriesLoading ? (
+                    <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" /></div>
+                  ) : inquiries.length === 0 ? (
+                    <div className="text-center py-8 text-black/60">No inquiries yet</div>
+                  ) : (
+                    inquiries.filter((q) => {
+                      const s = inquirySearch.toLowerCase().trim();
+                      if (!s) return true;
+                      const fields = [q.name, q.email, q.event_type, q.message];
+                      return fields.some((val: any) => String(val || '').toLowerCase().includes(s));
+                    }).map((q) => (
+                      <div key={q.id} className="p-4 bg-white rounded-xl border flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="font-medium text-black">{q.name}</p>
+                          <p className="text-sm text-black/60">{q.email} · {q.event_type || 'Event'} · {q.guests || '-'} guests</p>
+                          <p className="text-xs text-black/50">{q.created_at ? new Date(q.created_at).toLocaleString() : ''}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => openViewInquiry(q)} className="p-2 rounded-lg hover:bg-gray-100"><Eye className="w-4 h-4" /></button>
+                          <button onClick={() => openEmailModal(q)} className="p-2 rounded-lg hover:bg-gray-100"><Send className="w-4 h-4" /></button>
+                          <button onClick={() => openConfirm(`Delete inquiry from ${q.name}?`, () => deleteInquiryRow(q))} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="flex items-center justify-between pt-4">
+                  <p className="text-sm text-black/60">Page {inqPage} of {Math.max(1, Math.ceil(inqTotal / inqLimit))}</p>
+                  <div className="flex items-center gap-2">
+                    <Button onClick={() => setInqPage((p) => Math.max(1, p - 1))} variant="outline">Prev</Button>
+                    <Button onClick={() => setInqPage((p) => (p * inqLimit < inqTotal ? p + 1 : p))} variant="outline">Next</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+  {editingOrderId && editingOrder && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
+                <h3 className="text-xl font-semibold text-black mb-4">Edit Order</h3>
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <Input placeholder="Customer name" value={editingOrder.name} onChange={(e) => setEditingOrder({ ...editingOrder, name: e.target.value })} />
+                  <Input placeholder="Email" value={editingOrder.email} onChange={(e) => setEditingOrder({ ...editingOrder, email: e.target.value })} />
+                  <Input placeholder="Phone" value={editingOrder.phone} onChange={(e) => setEditingOrder({ ...editingOrder, phone: e.target.value })} />
+                  <Input placeholder="Address" value={editingOrder.address} onChange={(e) => setEditingOrder({ ...editingOrder, address: e.target.value })} />
+                  <Input placeholder="City" value={editingOrder.city} onChange={(e) => setEditingOrder({ ...editingOrder, city: e.target.value })} />
+                  <Input placeholder="State" value={editingOrder.state} onChange={(e) => setEditingOrder({ ...editingOrder, state: e.target.value })} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button onClick={saveEditOrder} className="bg-green-600 hover:bg-green-700 text-white"><Save className="w-4 h-4 mr-2" /> Save</Button>
+                  <Button onClick={() => { setEditingOrderId(null); setEditingOrder(null); }} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+                </div>
+              </div>
+            </div>
+  )}
+  {viewOrder && (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-3xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
+        <h3 className="text-xl font-semibold text-black mb-4">Order Details</h3>
+        <div className="grid md:grid-cols-2 gap-4 mb-4 text-sm">
+          <div>
+            <p className="text-black/70"><span className="font-medium">Tracking:</span> {viewOrder.tracking_code}</p>
+            <p className="text-black/70"><span className="font-medium">Customer:</span> {viewOrder.customer_name}</p>
+            <p className="text-black/70"><span className="font-medium">Email:</span> {viewOrder.email || '-'}</p>
+            <p className="text-black/70"><span className="font-medium">Phone:</span> {viewOrder.phone || '-'}</p>
+          </div>
+          <div>
+            <p className="text-black/70"><span className="font-medium">Address:</span> {viewOrder.address}</p>
+            <p className="text-black/70"><span className="font-medium">City:</span> {viewOrder.city}</p>
+            <p className="text-black/70"><span className="font-medium">State:</span> {viewOrder.state}</p>
+            <p className="text-black/70"><span className="font-medium">Total:</span> ₦{Number(viewOrder.total || 0).toLocaleString()}</p>
+          </div>
+        </div>
+        <div className="mb-4">
+          <p className="font-medium text-black mb-2">Items</p>
+          <div className="space-y-2">
+            {(viewOrder.items || []).map((it: any, idx: number) => (
+              <div key={idx} className="flex items-center justify-between text-sm p-2 rounded bg-[#F7F3EC]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <img src={it.image} alt={it.name} className="w-10 h-10 rounded object-cover" />
+                  <p className="text-black truncate">{it.name}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-black/60">x{it.quantity}</span>
+                  <span className="font-medium text-black">₦{Number(it.price || 0).toLocaleString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 justify-end">
+          <Button onClick={() => setViewOrder(null)} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Close</Button>
+        </div>
+      </div>
+    </div>
+  )}
+          {showCreateOrder && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg">
+                <h3 className="text-xl font-semibold text-black mb-4">Create Order</h3>
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <Input placeholder="Customer name" value={newOrder.name} onChange={(e) => setNewOrder({ ...newOrder, name: e.target.value })} />
+                  <Input placeholder="Email" value={newOrder.email} onChange={(e) => setNewOrder({ ...newOrder, email: e.target.value })} />
+                  <Input placeholder="Phone" value={newOrder.phone} onChange={(e) => setNewOrder({ ...newOrder, phone: e.target.value })} />
+                  <Input placeholder="Address" value={newOrder.address} onChange={(e) => setNewOrder({ ...newOrder, address: e.target.value })} />
+                  <Input placeholder="City" value={newOrder.city} onChange={(e) => setNewOrder({ ...newOrder, city: e.target.value })} />
+                  <Input placeholder="State" value={newOrder.state} onChange={(e) => setNewOrder({ ...newOrder, state: e.target.value })} />
+                </div>
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium text-black">Items</p>
+                    <Button variant="outline" onClick={addNewOrderItem}><Plus className="w-4 h-4 mr-2" /> Add Item</Button>
+                  </div>
+                  <div className="space-y-2">
+                    {newOrderItems.map((it, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2">
+                        <Input className="col-span-6" placeholder="Name" value={it.name} onChange={(e) => setNewOrderItems((prev) => prev.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))} />
+                        <Input className="col-span-3" type="number" placeholder="Price" value={it.price} onChange={(e) => setNewOrderItems((prev) => prev.map((x, i) => i === idx ? { ...x, price: e.target.value } : x))} />
+                        <Input className="col-span-2" type="number" placeholder="Qty" value={it.quantity} onChange={(e) => setNewOrderItems((prev) => prev.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value || 1) } : x))} />
+                        <button onClick={() => setNewOrderItems((prev) => prev.filter((_, i) => i !== idx))} className="col-span-1 p-2 rounded hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button onClick={createOrderAdmin} className="bg-green-600 hover:bg-green-700 text-white"><Save className="w-4 h-4 mr-2" /> Save</Button>
+                  <Button onClick={() => { setShowCreateOrder(false); setNewOrderItems([]); }} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+                </div>
+              </div>
+            </div>
+          )}
 
+          <TabsContent value="vouchers">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Voucher Management</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Input className="w-64" placeholder="Search vouchers" value={voucherSearch} onChange={(e) => setVoucherSearch(e.target.value)} />
+                  <Button onClick={() => setShowAddVoucher(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
+                    <Plus className="w-4 h-4 mr-2" /> Add Voucher
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {showAddVoucher && (
+                  <div className="mb-6 p-6 bg-[#F7F3EC] rounded-xl">
+                    <div className="grid md:grid-cols-2 gap-4 mb-4">
+                      <Input placeholder="Code (e.g., HANNIE10)" value={newVoucher.code} onChange={(e) => setNewVoucher({ ...newVoucher, code: e.target.value })} />
+                      <Select value={newVoucher.discount_type} onValueChange={(v) => setNewVoucher({ ...newVoucher, discount_type: v })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percent">Percent</SelectItem>
+                          <SelectItem value="fixed">Fixed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input type="number" placeholder="Discount value" value={newVoucher.discount_value} onChange={(e) => setNewVoucher({ ...newVoucher, discount_value: e.target.value })} />
+                      <Input type="number" placeholder="Min order amount (optional)" value={newVoucher.min_order_amount} onChange={(e) => setNewVoucher({ ...newVoucher, min_order_amount: e.target.value })} />
+                      <Input type="date" placeholder="Start date" value={newVoucher.start_date} onChange={(e) => setNewVoucher({ ...newVoucher, start_date: e.target.value })} />
+                      <Input type="date" placeholder="End date" value={newVoucher.end_date} onChange={(e) => setNewVoucher({ ...newVoucher, end_date: e.target.value })} />
+                      <Input type="number" placeholder="Usage limit (optional)" value={newVoucher.usage_limit} onChange={(e) => setNewVoucher({ ...newVoucher, usage_limit: e.target.value })} />
+                      <Input placeholder="Applicable categories (comma-separated)" value={newVoucher.applicable_categories} onChange={(e) => setNewVoucher({ ...newVoucher, applicable_categories: e.target.value })} />
+                      <Input type="number" placeholder="Max discount amount (optional)" value={newVoucher.max_discount} onChange={(e) => setNewVoucher({ ...newVoucher, max_discount: e.target.value })} />
+                      <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                        <span className="text-black">First-time customers only</span>
+                        <Switch checked={newVoucher.first_time_only} onCheckedChange={(v) => setNewVoucher({ ...newVoucher, first_time_only: v })} />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                        <span className="text-black">Single use per customer</span>
+                        <Switch checked={newVoucher.single_use_per_customer} onCheckedChange={(v) => setNewVoucher({ ...newVoucher, single_use_per_customer: v })} />
+                      </div>
+                      <Textarea placeholder="Admin note (optional)" value={newVoucher.note} onChange={(e) => setNewVoucher({ ...newVoucher, note: e.target.value })} />
+                      <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                        <span className="text-black">Active</span>
+                        <Switch checked={newVoucher.active} onCheckedChange={(v) => setNewVoucher({ ...newVoucher, active: v })} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button onClick={addVoucher} className="bg-green-600 hover:bg-green-700 text-white">
+                        <Save className="w-4 h-4 mr-2" /> Save Voucher
+                      </Button>
+                      <Button onClick={() => setShowAddVoucher(false)} className="bg-black hover:bg-black/90 text-white">
+                        <X className="w-4 h-4 mr-2" /> Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {vouchers.length === 0 ? (
+                    <div className="p-4 bg-white rounded-xl border">No vouchers created</div>
+                  ) : (
+                    vouchers.filter((v) => {
+                      const q = voucherSearch.toLowerCase().trim();
+                      if (!q) return true;
+                      const fields = [v.code, v.discount_type, v.note];
+                      return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
+                    }).map((v) => (
+                      <div key={v.id || v.code} className="p-4 bg-white rounded-xl border">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-black">{v.code}</p>
+                            <p className="text-sm text-black/60">
+                              {v.discount_type === 'percent' ? `${v.discount_value}%` : `₦${Number(v.discount_value || 0).toLocaleString()}`} off
+                              {v.min_order_amount ? ` · Min ₦${Number(v.min_order_amount).toLocaleString()}` : ''}
+                              {v.usage_limit ? ` · Limit ${Number(v.usage_limit)}` : ''}
+                            </p>
+                            {v.start_date || v.end_date ? (
+                              <p className="text-xs text-black/50">Valid {v.start_date || 'now'} to {v.end_date || 'indefinite'}</p>
+                            ) : null}
+                            {Array.isArray(v.applicable_categories) && v.applicable_categories.length > 0 && (
+                              <p className="text-xs text-black/50">Categories: {v.applicable_categories.join(', ')}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={v.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}>{v.active ? 'Active' : 'Inactive'}</Badge>
+                            <button onClick={() => toggleVoucherActive(v)} className="p-2 rounded hover:bg-[#F7F3EC]" title="Toggle Active">
+                              <Power className={v.active ? 'w-4 h-4 text-green-600' : 'w-4 h-4 text-gray-500'} />
+                            </button>
+                            <button onClick={() => openEditVoucher(v)} className="p-2 rounded hover:bg-[#F7F3EC]" title="Edit">
+                              <Pencil className="w-4 h-4 text-black" />
+                            </button>
+                            <button onClick={() => openConfirm(`Delete voucher ${v.code}?`, () => deleteVoucher(v))} className="p-2 rounded hover:bg-red-50" title="Delete">
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
           <TabsContent value="products">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Product Management</CardTitle>
-                <Button onClick={() => setShowAddProduct(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
-                  <Plus className="w-4 h-4 mr-2" /> Add Product
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Input className="w-64" placeholder="Search products" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+                  <Button onClick={() => setShowAddProduct(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
+                    <Plus className="w-4 h-4 mr-2" /> Add Product
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {showAddProduct && (
@@ -624,46 +1228,45 @@ export default function Admin() {
                       </Select>
                       <Input placeholder="Image URL" value={newProduct.image} onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })} />
                     </div>
-                    <Textarea placeholder="Description" value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} className="mb-4" />
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
-                      <div className="flex items-center gap-3">
-                        <label className="text-sm text-black/60">Upload Main Image</label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const f = e.target.files?.[0];
-                            if (!f) return;
-                            setUploadingMain(true);
-                            const url = await uploadFile(f, 'products');
-                            if (url) setNewProduct((np) => ({ ...np, image: url }));
-                            setUploadingMain(false);
-                          }}
-                        />
-                        {uploadingMain && <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <input type="file" accept="image/*" onChange={handleUploadCoverNew} className="block w-full max-w-full" />
+                        <Button disabled={uploadingCoverNew} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white whitespace-nowrap">
+                          {uploadingCoverNew ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" />Uploading...</>) : (<><ImagePlus className="w-4 h-4 mr-2" />Upload Cover</>)}
+                        </Button>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <label className="text-sm text-black/60">Upload Additional Images</label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={async (e) => {
-                            const files = Array.from(e.target.files || []);
-                            if (!files.length) return;
-                            setUploadingExtra(true);
-                            const urls: string[] = [];
-                            for (const f of files) {
-                              const u = await uploadFile(f, 'products');
-                              if (u) urls.push(u);
-                            }
-                            setNewProduct((np) => ({ ...(np as any), images: [ ...(((np as any).images) || []), ...urls ] }));
-                            setUploadingExtra(false);
-                          }}
-                        />
-                        {uploadingExtra && <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <input type="file" accept="image/*" multiple onChange={handleUploadImagesNew} className="block w-full max-w-full" />
+                        <Button disabled={uploadingImagesNew} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white whitespace-nowrap">
+                          {uploadingImagesNew ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" />Uploading...</>) : (<><ImagePlus className="w-4 h-4 mr-2" />Upload Images</>)}
+                        </Button>
                       </div>
                     </div>
+                    <div className="grid md:grid-cols-2 gap-4 mb-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <input type="file" accept="video/*" multiple onChange={handleUploadVideosNew} className="block w-full max-w-full" />
+                        <Button disabled={uploadingVideosNew} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white whitespace-nowrap">
+                          {uploadingVideosNew ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" />Uploading...</>) : (<><Video className="w-4 h-4 mr-2" />Upload Videos</>)}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-sm text-black/60 mb-2">Current Images</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.isArray((newProduct as any).images) && (newProduct as any).images.map((u: string, idx: number) => (
+                          <Badge key={idx} className="bg-black/5 text-black">{u}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-sm text-black/60 mb-2">Current Videos</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.isArray((newProduct as any).videos) && (newProduct as any).videos.map((u: string, idx: number) => (
+                          <Badge key={idx} className="bg-black/5 text-black">{u}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <Textarea placeholder="Description" value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} className="mb-4" />
                     <div className="grid md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <p className="text-sm text-black/60 mb-2">Additional Image URLs (comma-separated)</p>
@@ -680,6 +1283,26 @@ export default function Admin() {
                         }} />
                       </div>
                     </div>
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="flex items-center justify-between p-3 bg-[#F7F3EC] rounded-xl">
+              <span className="text-black">Ready Made</span>
+              <Switch checked={(newProduct as any).ready_made} onCheckedChange={(v) => setNewProduct((np) => ({ ...(np as any), ready_made: v }))} />
+            </div>
+            {!(newProduct as any).ready_made && (
+              <div className="grid grid-cols-2 gap-3">
+                <Input type="number" placeholder="Lead time value" value={(newProduct as any).lead_time_value} onChange={(e) => setNewProduct((np) => ({ ...(np as any), lead_time_value: e.target.value }))} />
+                <Select value={(newProduct as any).lead_time_unit} onValueChange={(v) => setNewProduct((np) => ({ ...(np as any), lead_time_unit: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hours">Hours</SelectItem>
+                    <SelectItem value="days">Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
                     <div className="flex gap-2">
                 <Button onClick={addProduct} disabled={addProductSaving} className="bg-green-600 hover:bg-green-700 text-white">
                   {addProductSaving ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving...</>) : (<><Save className="w-4 h-4 mr-2" />Save</>)}
@@ -692,7 +1315,12 @@ export default function Admin() {
                 )}
 
                 <div className="space-y-3">
-                  {products.map((product) => (
+                  {products.filter((product) => {
+                    const q = productSearch.toLowerCase().trim();
+                    if (!q) return true;
+                    const fields = [product.name, product.category, product.description];
+                    return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
+                  }).map((product) => (
                     <div key={product.id} className={cn('flex items-center gap-4 p-4 bg-white rounded-xl border transition-opacity', !product.visible && 'opacity-50')}>
                       <img src={product.image} alt={product.name} className="w-16 h-16 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
@@ -712,7 +1340,7 @@ export default function Admin() {
                         <button onClick={() => openEditProduct(product)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteProduct(product.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500">
+                        <button onClick={() => openConfirm(`Delete product ${product.name}?`, () => deleteProduct(product.id))} className="p-2 rounded-lg hover:bg-red-50 text-red-500">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -727,9 +1355,12 @@ export default function Admin() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Blog Management</CardTitle>
-                <Button onClick={() => setShowAddBlog(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
-                  <Plus className="w-4 h-4 mr-2" /> Add Post
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Input className="w-64" placeholder="Search blog posts" value={blogSearch} onChange={(e) => setBlogSearch(e.target.value)} />
+                  <Button onClick={() => setShowAddBlog(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
+                    <Plus className="w-4 h-4 mr-2" /> Add Post
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {showAddBlog && (
@@ -763,7 +1394,12 @@ export default function Admin() {
                 )}
 
                 <div className="space-y-3">
-                  {blogs.map((post) => (
+                  {blogs.filter((post) => {
+                    const q = blogSearch.toLowerCase().trim();
+                    if (!q) return true;
+                    const fields = [post.title, post.excerpt, post.category];
+                    return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
+                  }).map((post) => (
                     <div key={post.id} className={cn('flex items-center gap-4 p-4 bg-white rounded-xl border transition-opacity', !post.visible && 'opacity-50')}>
                       <img src={post.image} alt={post.title} className="w-20 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
@@ -774,7 +1410,10 @@ export default function Admin() {
                         <button onClick={() => toggleBlogVisibility(post.id)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
                           {post.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
-                        <button onClick={() => deleteBlog(post.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-500">
+                        <button onClick={() => openEditBlog(post)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-700">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => openConfirm(`Delete post ${post.title}?`, () => deleteBlog(post.id))} className="p-2 rounded-lg hover:bg-red-50 text-red-500">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -784,6 +1423,23 @@ export default function Admin() {
               </CardContent>
             </Card>
           </TabsContent>
+          {editingBlogId && editingBlog && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg">
+                <h3 className="text-xl font-semibold text-black mb-4">Edit Blog Post</h3>
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <Input placeholder="Title" value={editingBlog.title} onChange={(e) => setEditingBlog({ ...editingBlog, title: e.target.value })} />
+                  <Input placeholder="Image URL" value={editingBlog.image} onChange={(e) => setEditingBlog({ ...editingBlog, image: e.target.value })} />
+                  <Input placeholder="Category" value={editingBlog.category} onChange={(e) => setEditingBlog({ ...editingBlog, category: e.target.value })} />
+                </div>
+                <Textarea placeholder="Excerpt" value={editingBlog.excerpt} onChange={(e) => setEditingBlog({ ...editingBlog, excerpt: e.target.value })} className="mb-4" />
+                <div className="flex items-center gap-2">
+                  <Button onClick={saveEditBlog} className="bg-green-600 hover:bg-green-700 text-white"><Save className="w-4 h-4 mr-2" /> Save</Button>
+                  <Button onClick={() => { setEditingBlogId(null); setEditingBlog(null); }} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <TabsContent value="contact">
             <Card>
@@ -927,9 +1583,52 @@ export default function Admin() {
         </Tabs>
       </div>
     </div>
-    {editingProductId && editingData && (
+    {editingVoucherId && editingVoucher && (
       <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
         <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg">
+          <h3 className="text-xl font-semibold text-black mb-4">Edit Voucher</h3>
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <Input placeholder="Code" value={editingVoucher.code} onChange={(e) => setEditingVoucher({ ...editingVoucher, code: e.target.value })} />
+            <Select value={editingVoucher.discount_type} onValueChange={(v) => setEditingVoucher({ ...editingVoucher, discount_type: v })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="percent">Percent</SelectItem>
+                <SelectItem value="fixed">Fixed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input type="number" placeholder="Discount value" value={editingVoucher.discount_value} onChange={(e) => setEditingVoucher({ ...editingVoucher, discount_value: e.target.value })} />
+            <Input type="number" placeholder="Min order amount" value={editingVoucher.min_order_amount} onChange={(e) => setEditingVoucher({ ...editingVoucher, min_order_amount: e.target.value })} />
+            <Input type="date" placeholder="Start date" value={editingVoucher.start_date} onChange={(e) => setEditingVoucher({ ...editingVoucher, start_date: e.target.value })} />
+            <Input type="date" placeholder="End date" value={editingVoucher.end_date} onChange={(e) => setEditingVoucher({ ...editingVoucher, end_date: e.target.value })} />
+            <Input type="number" placeholder="Usage limit" value={editingVoucher.usage_limit} onChange={(e) => setEditingVoucher({ ...editingVoucher, usage_limit: e.target.value })} />
+            <Input placeholder="Applicable categories (comma-separated)" value={editingVoucher.applicable_categories} onChange={(e) => setEditingVoucher({ ...editingVoucher, applicable_categories: e.target.value })} />
+            <Input type="number" placeholder="Max discount" value={editingVoucher.max_discount} onChange={(e) => setEditingVoucher({ ...editingVoucher, max_discount: e.target.value })} />
+            <div className="flex items-center justify-between p-3 bg-[#F7F3EC] rounded-lg">
+              <span className="text-black">First-time only</span>
+              <Switch checked={editingVoucher.first_time_only} onCheckedChange={(v) => setEditingVoucher({ ...editingVoucher, first_time_only: v })} />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-[#F7F3EC] rounded-lg">
+              <span className="text-black">Single use per customer</span>
+              <Switch checked={editingVoucher.single_use_per_customer} onCheckedChange={(v) => setEditingVoucher({ ...editingVoucher, single_use_per_customer: v })} />
+            </div>
+          </div>
+          <Textarea placeholder="Admin note" value={editingVoucher.note} onChange={(e) => setEditingVoucher({ ...editingVoucher, note: e.target.value })} className="mb-4" />
+          <div className="flex items-center gap-2">
+            <Button onClick={saveEditVoucher} className="bg-green-600 hover:bg-green-700 text-white">
+              <Save className="w-4 h-4 mr-2" /> Save
+            </Button>
+            <Button onClick={() => { setEditingVoucherId(null); setEditingVoucher(null); }} className="bg-black hover:bg-black/90 text-white">
+              <X className="w-4 h-4 mr-2" /> Cancel
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    {editingProductId && editingData && (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
           <h3 className="text-xl font-semibold text-black mb-4">Edit Product</h3>
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <Input placeholder="Product Name" value={editingData.name} onChange={(e) => setEditingData({ ...editingData, name: e.target.value })} />
@@ -946,6 +1645,44 @@ export default function Admin() {
               </SelectContent>
             </Select>
             <Input placeholder="Image URL" value={editingData.image} onChange={(e) => setEditingData({ ...editingData, image: e.target.value })} />
+          </div>
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <input type="file" accept="image/*" onChange={handleUploadCoverEdit} className="block w-full max-w-full" />
+              <Button disabled={uploadingCoverEdit} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white whitespace-nowrap">
+                {uploadingCoverEdit ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" />Uploading...</>) : (<><ImagePlus className="w-4 h-4 mr-2" />Upload Cover</>)}
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <input type="file" accept="image/*" multiple onChange={handleUploadImagesEdit} className="block w-full max-w-full" />
+              <Button disabled={uploadingImagesEdit} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white whitespace-nowrap">
+                {uploadingImagesEdit ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" />Uploading...</>) : (<><ImagePlus className="w-4 h-4 mr-2" />Upload Images</>)}
+              </Button>
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <input type="file" accept="video/*" multiple onChange={handleUploadVideosEdit} className="block w-full max-w-full" />
+              <Button disabled={uploadingVideosEdit} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white whitespace-nowrap">
+                {uploadingVideosEdit ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" />Uploading...</>) : (<><Video className="w-4 h-4 mr-2" />Upload Videos</>)}
+              </Button>
+            </div>
+          </div>
+          <div className="mb-4">
+            <p className="text-sm text-black/60 mb-2">Current Images</p>
+            <div className="flex flex-wrap gap-2">
+              {Array.isArray((editingData as any).images) && (editingData as any).images.map((u: string, idx: number) => (
+                <Badge key={idx} className="bg-black/5 text-black">{u}</Badge>
+              ))}
+            </div>
+          </div>
+          <div className="mb-4">
+            <p className="text-sm text-black/60 mb-2">Current Videos</p>
+            <div className="flex flex-wrap gap-2">
+              {Array.isArray((editingData as any).videos) && (editingData as any).videos.map((u: string, idx: number) => (
+                <Badge key={idx} className="bg-black/5 text-black">{u}</Badge>
+              ))}
+            </div>
           </div>
           <Textarea placeholder="Description" value={editingData.description} onChange={(e) => setEditingData({ ...editingData, description: e.target.value })} className="mb-4" />
           <div className="grid md:grid-cols-2 gap-4 mb-4">
@@ -964,6 +1701,26 @@ export default function Admin() {
               }} />
             </div>
           </div>
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="flex items-center justify-between p-3 bg-[#F7F3EC] rounded-xl">
+              <span className="text-black">Ready Made</span>
+              <Switch checked={(editingData as any).ready_made} onCheckedChange={(v) => setEditingData((ed: any) => ({ ...ed, ready_made: v }))} />
+            </div>
+            {!(editingData as any).ready_made && (
+              <div className="grid grid-cols-2 gap-3">
+                <Input type="number" placeholder="Lead time value" value={(editingData as any).lead_time_value} onChange={(e) => setEditingData((ed: any) => ({ ...ed, lead_time_value: e.target.value }))} />
+                <Select value={(editingData as any).lead_time_unit} onValueChange={(v) => setEditingData((ed: any) => ({ ...ed, lead_time_unit: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hours">Hours</SelectItem>
+                    <SelectItem value="days">Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
       <div className="flex justify-end gap-2">
         <Button onClick={saveEditProduct} disabled={editSaving} className="bg-green-600 hover:bg-green-700 text-white">
           {editSaving ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...</>) : (<><Save className="w-4 h-4 mr-2" /> Save Changes</>)}
@@ -975,5 +1732,39 @@ export default function Admin() {
         </div>
       </div>
     )}
+    {confirmDialog && confirmDialog.open && (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-lg max-h-[85vh] overflow-y-auto">
+          <h3 className="text-xl font-semibold text-black mb-2">Confirm Delete</h3>
+          <p className="text-sm text-black/70 mb-4">{confirmDialog.message}</p>
+          <div className="flex items-center gap-2 justify-end">
+            <Button onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }} className="bg-red-600 hover:bg-red-700 text-white"><Trash2 className="w-4 h-4 mr-2" /> Delete</Button>
+            <Button onClick={() => setConfirmDialog(null)} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+          </div>
+        </div>
+      </div>
+    )}
   </>);
+  function openEditBlog(post: any) {
+    setEditingBlogId(post.id);
+    setEditingBlog({ title: post.title, image: post.image || '', category: post.category || '', excerpt: post.excerpt || '' });
+  }
+  async function saveEditBlog() {
+    if (!editingBlogId || !editingBlog) return;
+    const payload: any = { title: editingBlog.title, image: editingBlog.image || null, category: editingBlog.category || null, excerpt: editingBlog.excerpt || null };
+    await supabase.from('blog_posts').update(payload).eq('id', editingBlogId);
+    setBlogs((prev) => prev.map((p) => (p.id === editingBlogId ? { ...p, ...payload } : p)));
+    setEditingBlogId(null);
+    setEditingBlog(null);
+  }
+
+  function openEmailModal(q: any) {
+    setEmailDraft({ to: q.email, subject: `Re: Your ${q.event_type || 'event'} inquiry`, html: `<p>Hi ${q.name || ''},</p><p>Thanks for reaching out! We’ll get back to you shortly.</p><p>Warm regards,<br/>Maison Hannie</p>` });
+    setShowEmailModal(true);
+  }
+  function openViewInquiry(q: any) { setViewInquiry(q); }
+  async function sendInquiryEmail() {
+    const resp = await fetch('/api/admin/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: [emailDraft.to], subject: emailDraft.subject, html: emailDraft.html }) });
+    if (resp.ok) setShowEmailModal(false);
+  }
 }
