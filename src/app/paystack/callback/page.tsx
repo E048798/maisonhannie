@@ -1,12 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCart } from '@/components/cart/CartContext';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Package, ArrowRight } from 'lucide-react';
 
-export default function PaystackCallbackPage() {
+function CallbackContent() {
   const params = useSearchParams();
   const reference = params.get('reference') || '';
   const { clearCart } = useCart();
@@ -93,5 +93,13 @@ export default function PaystackCallbackPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaystackCallbackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F7F3EC] flex items-center justify-center"><div className="text-black">Loading...</div></div>}>
+      <CallbackContent />
+    </Suspense>
   );
 }
