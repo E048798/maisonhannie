@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import RichTextEditor from '@/components/admin/RichTextEditor';
 import { supabase } from '@/lib/supabaseClient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Package, FileText, Eye, EyeOff, Star, Trash2, Plus, Save, X, Mail, Bell, ShoppingCart, Loader2, LogOut, Pencil, ImagePlus, Video, Tag, Power, Inbox, Send } from 'lucide-react';
+import { Settings, Package, FileText, Eye, EyeOff, Star, Trash2, Plus, Save, X, Mail, Bell, ShoppingCart, Loader2, LogOut, Pencil, ImagePlus, Video, Tag, Power, Inbox, Send, Megaphone } from 'lucide-react';
 import { allProducts, blogPosts } from '@/components/data/dummyData';
 import { cn } from '@/lib/utils';
 
@@ -97,6 +98,37 @@ export default function Admin() {
 
   function openViewOrder(order: any) {
     setViewOrder(order);
+  }
+
+  async function issueReceipt(order: any) {
+    try {
+      setIssuingReceiptId(order.id);
+      const payload = {
+        order: {
+          customer_name: order.customer_name,
+          email: order.email || receiptConfirmEmail,
+          tracking_code: order.tracking_code,
+          items: (order.items || []).map((it: any) => ({ name: it.name, quantity: Number(it.quantity || 1), price: Number(it.price || 0) })),
+          total: Number(order.total || 0),
+        }
+      };
+      const resp = await fetch('/api/admin/receipt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!resp.ok) {
+        const t = await resp.text();
+        console.error('Receipt error', t);
+        setReceiptToast({ type: 'error', message: 'Failed to email receipt' });
+        setTimeout(() => setReceiptToast(null), 3000);
+      } else {
+        setReceiptToast({ type: 'success', message: 'Receipt sent' });
+        setTimeout(() => setReceiptToast(null), 3000);
+      }
+    } catch (e) {
+      console.error(e);
+      setReceiptToast({ type: 'error', message: 'Error issuing receipt' });
+      setTimeout(() => setReceiptToast(null), 3000);
+    } finally {
+      setIssuingReceiptId(null);
+    }
   }
 
   async function saveEditOrder() {
@@ -315,11 +347,22 @@ export default function Admin() {
   const [inqLimit, setInqLimit] = useState(10);
   const [inqTotal, setInqTotal] = useState(0);
   const [inquirySearch, setInquirySearch] = useState('');
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState<any[]>([]);
+  const [newsletterSearch, setNewsletterSearch] = useState('');
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailDraft, setEmailDraft] = useState({ to: '', subject: '', html: '' });
+  const [emailDraft, setEmailDraft] = useState({ to: '', subject: '', html: '', attachments: [] as { name: string; url: string }[] });
+  const [emailAudience, setEmailAudience] = useState<'customer' | 'newsletter'>('customer');
+  const [emailContext, setEmailContext] = useState<'general' | 'voucher' | 'inquiry'>('general');
+  const [showContactEmailModal, setShowContactEmailModal] = useState(false);
+  const [contactEmailDraft, setContactEmailDraft] = useState({ to: '', subject: '', html: '', attachments: [] as { name: string; url: string }[] });
+  const emailEditorRef = useRef<HTMLDivElement | null>(null);
   const [viewInquiry, setViewInquiry] = useState<any | null>(null);
   const [editingBlogId, setEditingBlogId] = useState<number | string | null>(null);
   const [editingBlog, setEditingBlog] = useState<any | null>(null);
+  const [issuingReceiptId, setIssuingReceiptId] = useState<number | string | null>(null);
+  const [receiptToast, setReceiptToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [receiptConfirmOrder, setReceiptConfirmOrder] = useState<any | null>(null);
+  const [receiptConfirmEmail, setReceiptConfirmEmail] = useState<string>('');
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [showAddVoucher, setShowAddVoucher] = useState(false);
   const [newVoucher, setNewVoucher] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order_amount: '', start_date: '', end_date: '', usage_limit: '', active: true, first_time_only: false, single_use_per_customer: false, applicable_categories: '', max_discount: '', note: '' });
@@ -353,23 +396,42 @@ export default function Admin() {
   const [uploadingVideosNew, setUploadingVideosNew] = useState(false);
 
   async function toggleProductVisibility(id: number | string) {
-    const target = products.find((p) => p.id === id);
+    const target = products.find((p) => String(p.id) === String(id));
     if (!target) return;
     const newHidden = !!target.visible;
-    await supabase.from('products').update({ hidden: newHidden }).eq('id', Number(id));
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, visible: !p.visible } : p)));
+    await supabase.from('products').update({ hidden: newHidden }).eq('id', id as any);
+    setProducts((prev) => prev.map((p) => (String(p.id) === String(id) ? { ...p, visible: !p.visible } : p)));
   }
 
   async function toggleProductFeatured(id: number | string) {
-    const target = products.find((p) => p.id === id);
+    const target = products.find((p) => String(p.id) === String(id));
     if (!target) return;
-    await supabase.from('products').update({ featured: !target.featured }).eq('id', Number(id));
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, featured: !p.featured } : p)));
+    await supabase.from('products').update({ featured: !target.featured }).eq('id', id as any);
+    setProducts((prev) => prev.map((p) => (String(p.id) === String(id) ? { ...p, featured: !p.featured } : p)));
   }
 
-  async function deleteProduct(id: number | string) {
-    await supabase.from('products').delete().eq('id', Number(id));
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  async function deleteProduct(prod: any) {
+    try {
+      const resp = await fetch('/api/admin/delete-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: prod?.id ?? null, name: prod?.name ?? '' })
+      });
+      if (!resp.ok) {
+        const t = await resp.text();
+        console.error('Delete failed', t);
+        setReceiptToast({ type: 'error', message: 'Failed to delete product' });
+        setTimeout(() => setReceiptToast(null), 3000);
+      } else {
+        setProducts((prev) => prev.filter((p) => String(p.id) !== String(prod?.id) && String(p.name) !== String(prod?.name)));
+        setReceiptToast({ type: 'success', message: 'Product deleted' });
+        setTimeout(() => setReceiptToast(null), 3000);
+      }
+    } catch (e) {
+      console.error(e);
+      setReceiptToast({ type: 'error', message: 'Error deleting product' });
+      setTimeout(() => setReceiptToast(null), 3000);
+    }
   }
 
   async function addProduct() {
@@ -618,6 +680,17 @@ async function addBlog() {
     loadInquiries();
   }, [isAuthenticated, inqPage, inqLimit]);
 
+  useEffect(() => {
+    async function loadNewsletter() {
+      if (!isAuthenticated) return;
+      try {
+        const { data } = await supabase.from('newsletter_subscriptions').select('*').order('created_at', { ascending: false });
+        setNewsletterSubscribers(data || []);
+      } catch {}
+    }
+    loadNewsletter();
+  }, [isAuthenticated]);
+
   async function saveContactInfoAdmin() {
     setContactSaving(true);
     const payload = {
@@ -755,7 +828,7 @@ async function addBlog() {
 
   if (isLoading) {
     return (
-      <div className="pt-24 pb-20 min-h-screen bg-[#F7F3EC] flex items-center justify-center">
+      <div className="pt-[50px] pb-[50px] sm:pt-24 sm:pb-20 min-h-screen bg-[#F7F3EC] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
       </div>
     );
@@ -763,7 +836,7 @@ async function addBlog() {
 
   if (!isAuthenticated) {
     return (
-      <div className="pt-24 pb-20 min-h-screen bg-[#F7F3EC] flex items-center justify-center">
+      <div className="pt-[50px] pb-[50px] sm:pt-24 sm:pb-20 min-h-screen bg-[#F7F3EC] flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-serif">Admin Login</CardTitle>
@@ -785,58 +858,68 @@ async function addBlog() {
   }
 
   return (<>
-    <div className="pt-24 pb-20 min-h-screen bg-[#F7F3EC]">
+    <div className="pt-[50px] pb-[50px] sm:pt-24 sm:pb-20 min-h-screen bg-[#F7F3EC]">
       <div className="max-w-7xl mx-auto px-4">
+        {receiptToast && (
+          <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full shadow-lg ${receiptToast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+            {receiptToast.message}
+          </div>
+        )}
         <div className="mb-8 flex justify-between items-start">
           <div>
             <h1 className="text-3xl md:text-4xl font-serif text-black">Admin Panel</h1>
             <p className="text-black/60 mt-2">Welcome, {user?.full_name || user?.email}</p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="gap-2">
+          <Button onClick={handleLogout} className="gap-2 bg-red-600 hover:bg-red-700 text-white">
             <LogOut className="w-4 h-4" /> Logout
           </Button>
         </div>
 
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="bg-white p-1 rounded-xl">
-            <TabsTrigger value="orders" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+          <TabsList className="bg-white p-1 rounded-xl -mx-4 px-4 flex flex-wrap gap-2">
+            <TabsTrigger value="orders" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <ShoppingCart className="w-4 h-4 mr-2" /> Orders
             </TabsTrigger>
-            <TabsTrigger value="products" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+            <TabsTrigger value="products" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <Package className="w-4 h-4 mr-2" /> Products
             </TabsTrigger>
-            <TabsTrigger value="blog" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+            <TabsTrigger value="blog" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <FileText className="w-4 h-4 mr-2" /> Blog
             </TabsTrigger>
-            <TabsTrigger value="contact" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+            <TabsTrigger value="contact" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <Mail className="w-4 h-4 mr-2" /> Contact
             </TabsTrigger>
-            <TabsTrigger value="inquiries" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+            <TabsTrigger value="inquiries" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <Inbox className="w-4 h-4 mr-2" /> Inquiries
             </TabsTrigger>
-            <TabsTrigger value="vouchers" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+            <TabsTrigger value="newsletter" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+              <Megaphone className="w-4 h-4 mr-2" /> Newsletter
+            </TabsTrigger>
+            <TabsTrigger value="vouchers" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <Tag className="w-4 h-4 mr-2" /> Vouchers
             </TabsTrigger>
-            <TabsTrigger value="settings" className="rounded-lg data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+            <TabsTrigger value="settings" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <Settings className="w-4 h-4 mr-2" /> Settings
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders">
             <Card>
-      <CardHeader className="flex items-center justify-between">
+      <CardHeader className="flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
         <CardTitle>Order Management</CardTitle>
-        <div className="flex items-center gap-2">
-          <Input className="w-64" placeholder="Search orders" value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} />
-          <Select value={String(orderLimit)} onValueChange={(v) => setOrderLimit(Number(v))}>
-            <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="20">20</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={() => setShowCreateOrder(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white"><Plus className="w-4 h-4 mr-2" /> Create Order</Button>
+        <div className="flex w-full sm:w-auto items-center gap-2">
+          <Input className="w-full sm:w-64" placeholder="Search orders" value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} />
+          <div className="hidden md:block">
+            <Select value={String(orderLimit)} onValueChange={(v) => setOrderLimit(Number(v))}>
+              <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => setShowCreateOrder(true)} className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C4A030] text-white"><Plus className="w-4 h-4 mr-2" /> Create Order</Button>
         </div>
       </CardHeader>
               <CardContent>
@@ -875,7 +958,7 @@ async function addBlog() {
                             </p>
                           </div>
 
-                          <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div className="flex flex-wrap gap-2">
                               {order.items?.slice(0, 2).map((item: any, i: number) => (
                                 <img key={i} src={item.image} alt={item.name} className="w-10 h-10 rounded object-cover" />
@@ -885,7 +968,7 @@ async function addBlog() {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               {order.status === 'pending' && <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>}
                             </div>
                             <Select value={order.status} onValueChange={(value) => updateOrderStatus(order, value)}>
@@ -900,16 +983,19 @@ async function addBlog() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <button onClick={() => openViewOrder(order)} className="p-2 rounded-lg hover:bg-gray-100"><Eye className="w-4 h-4" /></button>
                               <button onClick={() => openEditOrder(order)} className="p-2 rounded-lg hover:bg-gray-100"><Pencil className="w-4 h-4" /></button>
+                              <button onClick={() => setReceiptConfirmOrder(order)} disabled={issuingReceiptId === order.id} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50">
+                                {issuingReceiptId === order.id ? (<Loader2 className="w-4 h-4 animate-spin" />) : (<FileText className="w-4 h-4" />)}
+                              </button>
                               <button onClick={() => openConfirm(`Delete order ${order.tracking_code}?`, () => deleteOrder(order))} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4" /></button>
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div className="flex items-center justify-between pt-4">
+                    <div className="hidden md:flex items-center justify-between pt-4">
                       <p className="text-sm text-black/60">Page {orderPage} of {Math.max(1, Math.ceil(orderTotal / orderLimit))}</p>
                       <div className="flex items-center gap-2">
                         <Button onClick={() => setOrderPage((p) => Math.max(1, p - 1))} variant="outline">Prev</Button>
@@ -925,12 +1011,110 @@ async function addBlog() {
             <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
                 <h3 className="text-xl font-semibold text-black mb-4">Send Email</h3>
-                <Input placeholder="To" value={emailDraft.to} onChange={(e) => setEmailDraft({ ...emailDraft, to: e.target.value })} className="mb-3" />
+                <Select value={emailAudience} onValueChange={(v) => {
+                  setEmailAudience(v as 'customer' | 'newsletter');
+                  if (v === 'newsletter') {
+                    setEmailDraft((d) => ({ ...d, to: '' }));
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer">Customer</SelectItem>
+                    <SelectItem value="newsletter">Newsletter</SelectItem>
+                  </SelectContent>
+                </Select>
+                {emailAudience === 'customer' && emailContext !== 'voucher' && (
+                  <div className="mt-3 mb-3">
+                    <Select value={emailDraft.to} onValueChange={(v) => setEmailDraft({ ...emailDraft, to: v })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Array.from(new Map((orders || []).filter((o: any) => !!o.email).map((o: any) => [String(o.email), { email: String(o.email), name: String(o.customer_name || '') }])).values())).map((c: any) => (
+                          <SelectItem key={c.email} value={c.email}>{c.name ? `${c.name} · ${c.email}` : c.email}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input placeholder="Or type email" value={emailDraft.to} onChange={(e) => setEmailDraft({ ...emailDraft, to: e.target.value })} className="mt-2" />
+                  </div>
+                )}
                 <Input placeholder="Subject" value={emailDraft.subject} onChange={(e) => setEmailDraft({ ...emailDraft, subject: e.target.value })} className="mb-3" />
-                <Textarea placeholder="Message (HTML supported)" value={emailDraft.html} onChange={(e) => setEmailDraft({ ...emailDraft, html: e.target.value })} className="mb-4 min-h-[160px]" />
-                <div className="flex items-center gap-2">
-                  <Button onClick={sendInquiryEmail} className="bg-green-600 hover:bg-green-700 text-white"><Send className="w-4 h-4 mr-2" /> Send</Button>
-                  <Button onClick={() => setShowEmailModal(false)} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+                <div className="mb-3">
+                  <RichTextEditor value={emailDraft.html} onChange={(html) => setEmailDraft({ ...emailDraft, html })} />
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-black">Attachments</p>
+                    <input type="file" multiple onChange={async (e) => {
+                      const files = e.target.files ? Array.from(e.target.files) : [];
+                      if (!files.length) return;
+                      const uploaded: { name: string; url: string }[] = [];
+                      for (const f of files) {
+                        const url = await uploadFile(f as File, 'attachments');
+                        if (url) uploaded.push({ name: (f as File).name, url });
+                      }
+                      setEmailDraft((d) => ({ ...d, attachments: [...d.attachments, ...uploaded] }));
+                      e.target.value = '' as any;
+                    }} />
+                  </div>
+                  {emailDraft.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {emailDraft.attachments.map((a, idx) => (
+                        <div key={idx} className="px-3 py-1 rounded-full bg-[#E5DCC5] text-sm text-black flex items-center gap-2">
+                          <a href={a.url} target="_blank" rel="noreferrer" className="underline">{a.name}</a>
+                          <button onClick={() => setEmailDraft((d) => ({ ...d, attachments: d.attachments.filter((_, i) => i !== idx) }))} className="p-1 rounded hover:bg-black/10">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                  <Button onClick={sendInquiryEmail} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"><Send className="w-4 h-4 mr-2" /> Send</Button>
+                  <Button onClick={() => setShowEmailModal(false)} className="w-full sm:w-auto bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+                </div>
+              </div>
+            </div>
+          )}
+          {showContactEmailModal && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
+                <h3 className="text-xl font-semibold text-black mb-4">Email Subscriber</h3>
+                <Input placeholder="To" value={contactEmailDraft.to} onChange={(e) => setContactEmailDraft({ ...contactEmailDraft, to: e.target.value })} className="mb-3" />
+                <Input placeholder="Subject" value={contactEmailDraft.subject} onChange={(e) => setContactEmailDraft({ ...contactEmailDraft, subject: e.target.value })} className="mb-3" />
+                <div className="mb-3">
+                  <RichTextEditor value={contactEmailDraft.html} onChange={(html) => setContactEmailDraft({ ...contactEmailDraft, html })} />
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-black">Attachments</p>
+                    <input type="file" multiple onChange={async (e) => {
+                      const files = e.target.files ? Array.from(e.target.files) : [];
+                      if (!files.length) return;
+                      const uploaded: { name: string; url: string }[] = [];
+                      for (const f of files) {
+                        const url = await uploadFile(f as File, 'attachments');
+                        if (url) uploaded.push({ name: (f as File).name, url });
+                      }
+                      setContactEmailDraft((d) => ({ ...d, attachments: [...d.attachments, ...uploaded] }));
+                      e.target.value = '' as any;
+                    }} />
+                  </div>
+                  {contactEmailDraft.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {contactEmailDraft.attachments.map((a, idx) => (
+                        <div key={idx} className="px-3 py-1 rounded-full bg-[#E5DCC5] text-sm text-black flex items-center gap-2">
+                          <a href={a.url} target="_blank" rel="noreferrer" className="underline">{a.name}</a>
+                          <button onClick={() => setContactEmailDraft((d) => ({ ...d, attachments: d.attachments.filter((_, i) => i !== idx) }))} className="p-1 rounded hover:bg-black/10">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                  <Button onClick={sendContactEmail} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"><Send className="w-4 h-4 mr-2" /> Send</Button>
+                  <Button onClick={() => setShowContactEmailModal(false)} className="w-full sm:w-auto bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
                 </div>
               </div>
             </div>
@@ -956,9 +1140,9 @@ async function addBlog() {
           )}
           <TabsContent value="inquiries">
             <Card>
-              <CardHeader className="flex items-center justify-between">
+              <CardHeader className="flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
                 <CardTitle>Catering Inquiries</CardTitle>
-                <Input className="w-64" placeholder="Search inquiries" value={inquirySearch} onChange={(e) => setInquirySearch(e.target.value)} />
+                <Input className="w-full sm:w-64" placeholder="Search inquiries" value={inquirySearch} onChange={(e) => setInquirySearch(e.target.value)} />
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -973,7 +1157,7 @@ async function addBlog() {
                       const fields = [q.name, q.email, q.event_type, q.message];
                       return fields.some((val: any) => String(val || '').toLowerCase().includes(s));
                     }).map((q) => (
-                      <div key={q.id} className="p-4 bg-white rounded-xl border flex items-center justify-between gap-4">
+                      <div key={q.id} className="p-4 bg-white rounded-xl border flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-4">
                         <div className="min-w-0">
                           <p className="font-medium text-black">{q.name}</p>
                           <p className="text-sm text-black/60">{q.email} · {q.event_type || 'Event'} · {q.guests || '-'} guests</p>
@@ -990,11 +1174,62 @@ async function addBlog() {
                 </div>
                 <div className="flex items-center justify-between pt-4">
                   <p className="text-sm text-black/60">Page {inqPage} of {Math.max(1, Math.ceil(inqTotal / inqLimit))}</p>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={() => setInqPage((p) => Math.max(1, p - 1))} variant="outline">Prev</Button>
-                    <Button onClick={() => setInqPage((p) => (p * inqLimit < inqTotal ? p + 1 : p))} variant="outline">Next</Button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Button onClick={() => setInqPage((p) => Math.max(1, p - 1))} variant="outline">Prev</Button>
+                  <Button onClick={() => setInqPage((p) => (p * inqLimit < inqTotal ? p + 1 : p))} className="bg-black hover:bg-black/90 text-white">Next</Button>
                 </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="newsletter">
+            <Card>
+              <CardHeader className="flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
+                <CardTitle>Newsletter Subscribers</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Input className="w-64" placeholder="Search subscribers" value={newsletterSearch} onChange={(e) => setNewsletterSearch(e.target.value)} />
+                  <Button onClick={() => {
+                    setEmailContext('general');
+                    setEmailAudience('newsletter');
+                    setEmailDraft({ to: '', subject: 'Updates from Maison Hannie', html: '<p>Hi there,</p><p>Here are our latest updates and offers.</p><p>Warm regards,<br/>Maison Hannie</p>', attachments: [] });
+                    setShowEmailModal(true);
+                  }} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
+                    <Send className="w-4 h-4 mr-2" /> Bulk Email
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {newsletterSubscribers.length === 0 ? (
+                  <div className="p-4 bg-white rounded-xl border">No subscribers</div>
+                ) : (
+                  <div className="space-y-3">
+                    {newsletterSubscribers.filter((s: any) => {
+                      const q = newsletterSearch.toLowerCase().trim();
+                      if (!q) return true;
+                      const fields = [s.email, s.name];
+                      return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
+                    }).map((s: any) => (
+                      <div key={s.id || s.email} className="p-4 bg-white rounded-xl border flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="font-medium text-black">{s.email}</p>
+                          <p className="text-sm text-black/60">{s.name || '-'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => {
+                            const nm = String(s.name || '').trim();
+                            setContactEmailDraft({
+                              to: String(s.email || ''),
+                              subject: nm ? `Hello ${nm}` : 'Hello from Maison Hannie',
+                              html: nm ? `<p>Hi ${nm},</p><p>Thanks for subscribing!</p>` : '<p>Hi,</p><p>Thanks for subscribing!</p>',
+                              attachments: []
+                            });
+                            setShowContactEmailModal(true);
+                          }} className="p-2 rounded-lg hover:bg-gray-100"><Mail className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1010,9 +1245,9 @@ async function addBlog() {
                   <Input placeholder="City" value={editingOrder.city} onChange={(e) => setEditingOrder({ ...editingOrder, city: e.target.value })} />
                   <Input placeholder="State" value={editingOrder.state} onChange={(e) => setEditingOrder({ ...editingOrder, state: e.target.value })} />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button onClick={saveEditOrder} className="bg-green-600 hover:bg-green-700 text-white"><Save className="w-4 h-4 mr-2" /> Save</Button>
-                  <Button onClick={() => { setEditingOrderId(null); setEditingOrder(null); }} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+                <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                  <Button onClick={saveEditOrder} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"><Save className="w-4 h-4 mr-2" /> Save</Button>
+                  <Button onClick={() => { setEditingOrderId(null); setEditingOrder(null); }} className="w-full sm:w-auto bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
                 </div>
               </div>
             </div>
@@ -1052,15 +1287,15 @@ async function addBlog() {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2 justify-end">
-          <Button onClick={() => setViewOrder(null)} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Close</Button>
+        <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+          <Button onClick={() => setViewOrder(null)} className="w-full sm:w-auto bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Close</Button>
         </div>
       </div>
     </div>
   )}
           {showCreateOrder && (
-            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg">
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
                 <h3 className="text-xl font-semibold text-black mb-4">Create Order</h3>
                 <div className="grid md:grid-cols-2 gap-4 mb-4">
                   <Input placeholder="Customer name" value={newOrder.name} onChange={(e) => setNewOrder({ ...newOrder, name: e.target.value })} />
@@ -1096,7 +1331,7 @@ async function addBlog() {
 
           <TabsContent value="vouchers">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
                 <CardTitle>Voucher Management</CardTitle>
                 <div className="flex items-center gap-2">
                   <Input className="w-64" placeholder="Search vouchers" value={voucherSearch} onChange={(e) => setVoucherSearch(e.target.value)} />
@@ -1182,6 +1417,14 @@ async function addBlog() {
                             <button onClick={() => toggleVoucherActive(v)} className="p-2 rounded hover:bg-[#F7F3EC]" title="Toggle Active">
                               <Power className={v.active ? 'w-4 h-4 text-green-600' : 'w-4 h-4 text-gray-500'} />
                             </button>
+                            <button onClick={() => {
+                              setEmailContext('voucher');
+                              setEmailAudience('newsletter');
+                              setEmailDraft({ to: '', subject: `Exclusive voucher: ${v.code}`, html: `<p>Use code <strong>${v.code}</strong> to get ${v.discount_type === 'percent' ? `${v.discount_value}%` : `NGN ${Number(v.discount_value || 0).toLocaleString()}`} off${v.min_order_amount ? ` on orders above NGN ${Number(v.min_order_amount).toLocaleString()}` : ''}.</p><p>${v.note || ''}</p>`, attachments: [] });
+                              setShowEmailModal(true);
+                            }} className="p-2 rounded hover:bg-[#F7F3EC]" title="Email Voucher">
+                              <Mail className="w-4 h-4 text-black" />
+                            </button>
                             <button onClick={() => openEditVoucher(v)} className="p-2 rounded hover:bg-[#F7F3EC]" title="Edit">
                               <Pencil className="w-4 h-4 text-black" />
                             </button>
@@ -1199,11 +1442,11 @@ async function addBlog() {
           </TabsContent>
           <TabsContent value="products">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
                 <CardTitle>Product Management</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Input className="w-64" placeholder="Search products" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
-                  <Button onClick={() => setShowAddProduct(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
+                <div className="flex w-full sm:w-auto items-center gap-2">
+                  <Input className="w-full sm:w-64" placeholder="Search products" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+                  <Button onClick={() => setShowAddProduct(true)} className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C4A030] text-white">
                     <Plus className="w-4 h-4 mr-2" /> Add Product
                   </Button>
                 </div>
@@ -1321,7 +1564,7 @@ async function addBlog() {
                     const fields = [product.name, product.category, product.description];
                     return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
                   }).map((product) => (
-                    <div key={product.id} className={cn('flex items-center gap-4 p-4 bg-white rounded-xl border transition-opacity', !product.visible && 'opacity-50')}>
+                    <div key={product.id} className={cn('flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white rounded-xl border transition-opacity', !product.visible && 'opacity-50')}>
                       <img src={product.image} alt={product.name} className="w-16 h-16 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -1330,7 +1573,7 @@ async function addBlog() {
                         </div>
                         <p className="text-sm text-black/60">{product.category} · ${product.price}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button onClick={() => toggleProductFeatured(product.id)} className={cn('p-2 rounded-lg transition-colors', product.featured ? 'bg-[#D4AF37]/20 text-[#D4AF37]' : 'hover:bg-gray-100 text-gray-400')}>
                           <Star className="w-4 h-4" />
                         </button>
@@ -1340,7 +1583,7 @@ async function addBlog() {
                         <button onClick={() => openEditProduct(product)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button onClick={() => openConfirm(`Delete product ${product.name}?`, () => deleteProduct(product.id))} className="p-2 rounded-lg hover:bg-red-50 text-red-500">
+                        <button onClick={() => openConfirm(`Delete product ${product.name}?`, () => deleteProduct(product))} className="p-2 rounded-lg hover:bg-red-50 text-red-500">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -1353,11 +1596,11 @@ async function addBlog() {
 
           <TabsContent value="blog">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
                 <CardTitle>Blog Management</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Input className="w-64" placeholder="Search blog posts" value={blogSearch} onChange={(e) => setBlogSearch(e.target.value)} />
-                  <Button onClick={() => setShowAddBlog(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
+                <div className="flex w-full sm:w-auto items-center gap-2">
+                  <Input className="w-full sm:w-64" placeholder="Search blog posts" value={blogSearch} onChange={(e) => setBlogSearch(e.target.value)} />
+                  <Button onClick={() => setShowAddBlog(true)} className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C4A030] text-white">
                     <Plus className="w-4 h-4 mr-2" /> Add Post
                   </Button>
                 </div>
@@ -1467,7 +1710,7 @@ async function addBlog() {
                   ) : (
                     hours.map((hour) => (
                       <div key={hour.id} className="p-4 bg-white rounded-xl border">
-                        <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-black">{hour.day}</p>
                             {editingHourId === hour.id ? (
@@ -1489,7 +1732,7 @@ async function addBlog() {
                             )}
                           </div>
                           {editingHourId === hour.id ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-col sm:flex-row items-stretch gap-2">
                 <Button onClick={saveBusinessHour} disabled={businessHourSaving} className="bg-green-600 hover:bg-green-700 text-white">
                   {businessHourSaving ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...</>) : (<><Save className="w-4 h-4 mr-2" /> Save</>)}
                 </Button>
@@ -1498,7 +1741,7 @@ async function addBlog() {
                 </Button>
                             </div>
                           ) : (
-                            <Button onClick={() => editBusinessHour(hour.id)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">Edit</Button>
+                            <Button onClick={() => editBusinessHour(hour.id)} className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C4A030] text-white">Edit</Button>
                           )}
                         </div>
                       </div>
@@ -1731,8 +1974,21 @@ async function addBlog() {
       </div>
         </div>
       </div>
-    )}
-    {confirmDialog && confirmDialog.open && (
+  )}
+  {receiptConfirmOrder && (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-lg max-h-[85vh] overflow-y-auto">
+        <h3 className="text-xl font-semibold text-black mb-2">Issue Receipt</h3>
+        <p className="text-sm text-black/70 mb-4">This will generate a PDF receipt and email it to the customer.</p>
+        <Input placeholder="Recipient email" value={receiptConfirmEmail || receiptConfirmOrder?.email || ''} onChange={(e) => setReceiptConfirmEmail(e.target.value)} className="mb-4" />
+        <div className="flex items-center gap-2 justify-end">
+          <Button onClick={async () => { await issueReceipt(receiptConfirmOrder); setReceiptConfirmOrder(null); setReceiptConfirmEmail(''); }} className="bg-green-600 hover:bg-green-700 text-white"><Send className="w-4 h-4 mr-2" /> Send</Button>
+          <Button onClick={() => { setReceiptConfirmOrder(null); setReceiptConfirmEmail(''); }} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+        </div>
+      </div>
+    </div>
+  )}
+  {confirmDialog && confirmDialog.open && (
       <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-lg max-h-[85vh] overflow-y-auto">
           <h3 className="text-xl font-semibold text-black mb-2">Confirm Delete</h3>
@@ -1759,12 +2015,76 @@ async function addBlog() {
   }
 
   function openEmailModal(q: any) {
-    setEmailDraft({ to: q.email, subject: `Re: Your ${q.event_type || 'event'} inquiry`, html: `<p>Hi ${q.name || ''},</p><p>Thanks for reaching out! We’ll get back to you shortly.</p><p>Warm regards,<br/>Maison Hannie</p>` });
+    setEmailAudience('customer');
+    setEmailContext('inquiry');
+    setEmailDraft({ to: q.email, subject: `Re: Your ${q.event_type || 'event'} inquiry`, html: `<p>Hi ${q.name || ''},</p><p>Thanks for reaching out! We’ll get back to you shortly.</p><p>Warm regards,<br/>Maison Hannie</p>`, attachments: [] });
     setShowEmailModal(true);
   }
   function openViewInquiry(q: any) { setViewInquiry(q); }
   async function sendInquiryEmail() {
-    const resp = await fetch('/api/admin/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: [emailDraft.to], subject: emailDraft.subject, html: emailDraft.html }) });
-    if (resp.ok) setShowEmailModal(false);
+    const attachBlock = (emailDraft.attachments && emailDraft.attachments.length)
+      ? (`<hr/><p><strong>Attachments:</strong></p><ul>${emailDraft.attachments.map((a) => `<li><a href="${a.url}">${a.name}</a></li>`).join('')}</ul>`)
+      : '';
+    if (emailAudience === 'newsletter' || (emailAudience === 'customer' && emailContext === 'voucher')) {
+      const subs = newsletterSubscribers
+        .map((s: any) => ({ email: String(s.email || ''), name: String(s.name || '') }))
+        .filter((x: any) => !!x.email);
+      let anyOk = false;
+      let anyErr = false;
+      for (const s of subs) {
+        const html = `${s.name ? `<p>Hi ${s.name},</p>` : ''}${emailDraft.html}${attachBlock}`;
+        const resp = await fetch('/api/admin/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: [s.email], subject: emailDraft.subject, html, attachments: (emailDraft.attachments || []).map((a) => ({ filename: a.name, content: '', path: a.url })) })
+        });
+        if (resp.ok) anyOk = true; else anyErr = true;
+      }
+      setShowEmailModal(false);
+      if (anyOk && !anyErr) {
+        setReceiptToast({ type: 'success', message: 'Emails sent' });
+      } else if (anyOk && anyErr) {
+        setReceiptToast({ type: 'error', message: 'Some emails failed to send' });
+      } else {
+        setReceiptToast({ type: 'error', message: 'Failed to send emails' });
+      }
+      setTimeout(() => setReceiptToast(null), 3000);
+      return;
+    }
+    const recipients = emailDraft.to.split(',').map((s) => s.trim()).filter(Boolean);
+    const resp = await fetch('/api/admin/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: recipients, subject: emailDraft.subject, html: `${emailDraft.html}${attachBlock}`, attachments: (emailDraft.attachments || []).map((a) => ({ filename: a.name, content: '', path: a.url })) }) });
+    if (resp.ok) {
+      setShowEmailModal(false);
+      setReceiptToast({ type: 'success', message: 'Email sent' });
+      setTimeout(() => setReceiptToast(null), 3000);
+    } else {
+      const t = await resp.text();
+      console.error('Email send error', t);
+      setReceiptToast({ type: 'error', message: 'Failed to send email' });
+      setTimeout(() => setReceiptToast(null), 3000);
+    }
+  }
+
+  async function sendContactEmail() {
+    const attachBlock = (contactEmailDraft.attachments && contactEmailDraft.attachments.length)
+      ? (`<hr/><p><strong>Attachments:</strong></p><ul>${contactEmailDraft.attachments.map((a) => `<li><a href="${a.url}">${a.name}</a></li>`).join('')}</ul>`)
+      : '';
+    const recipient = String(contactEmailDraft.to || '').trim();
+    if (!recipient) return;
+    const resp = await fetch('/api/admin/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: [recipient], subject: contactEmailDraft.subject, html: `${contactEmailDraft.html}${attachBlock}`, attachments: (contactEmailDraft.attachments || []).map((a) => ({ filename: a.name, content: '', path: a.url })) })
+    });
+    if (resp.ok) {
+      setShowContactEmailModal(false);
+      setReceiptToast({ type: 'success', message: 'Email sent' });
+      setTimeout(() => setReceiptToast(null), 3000);
+    } else {
+      const t = await resp.text();
+      console.error('Email send error', t);
+      setReceiptToast({ type: 'error', message: 'Failed to send email' });
+      setTimeout(() => setReceiptToast(null), 3000);
+    }
   }
 }

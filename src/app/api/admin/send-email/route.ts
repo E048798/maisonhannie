@@ -5,6 +5,7 @@ export async function POST(req: Request) {
     const to = Array.isArray(body?.to) ? body.to : (body?.to ? [String(body.to)] : []);
     const subject = String(body?.subject || '').trim();
     const html = String(body?.html || '').trim();
+    const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
     if (!to.length || !subject || !html) return new Response(JSON.stringify({ error: 'Missing to/subject/html' }), { status: 400 });
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) return new Response(JSON.stringify({ error: 'Missing RESEND_API_KEY' }), { status: 500 });
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ from, to, subject, html })
+      body: JSON.stringify({ from, to, subject, html, attachments })
     });
     if (!resp.ok) return new Response(JSON.stringify({ error: 'Failed to send email' }), { status: 500 });
     return new Response(JSON.stringify({ ok: true }));

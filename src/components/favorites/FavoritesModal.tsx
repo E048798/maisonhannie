@@ -34,18 +34,20 @@ export default function FavoritesModal({ isOpen, onClose }: { isOpen: boolean; o
               <p className="text-black/60 text-center py-8">No favorites yet</p>
             ) : (
               favorites.map((p) => (
-                <div key={p.id} className="flex items-center gap-4 p-3 bg-[#F7F3EC] rounded-xl">
+                <div key={p.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 bg-[#F7F3EC] rounded-xl">
                   <img src={p.image} alt={p.name} className="w-16 h-16 rounded-lg object-cover" />
-                  <div className="flex-1">
+                  <div className="flex-1 w-full">
                     <p className="font-medium text-black">{p.name}</p>
                     <p className="text-sm text-[#D4AF37]">₦{p.price?.toLocaleString?.() ?? p.price}</p>
                   </div>
-                  <Button onClick={() => addToCart(p)} className="rounded-full bg-[#D4AF37] hover:bg-[#C4A030] text-white">
-                    <ShoppingBag className="w-4 h-4 mr-2" /> Add
-                  </Button>
-                  <Button onClick={() => removeFavorite(p.id)} className="rounded-full bg-black hover:bg-black/90 text-white">
-                    <Trash2 className="w-4 h-4 mr-2" /> Remove
-                  </Button>
+                  <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full sm:w-auto">
+                    <Button onClick={() => addToCart(p)} className="w-full sm:w-auto rounded-full bg-[#D4AF37] hover:bg-[#C4A030] text-white">
+                      <ShoppingBag className="w-4 h-4 mr-2" /> Add
+                    </Button>
+                    <Button onClick={() => removeFavorite(p.id)} className="w-full sm:w-auto rounded-full bg-black hover:bg-black/90 text-white">
+                      <Trash2 className="w-4 h-4 mr-2" /> Remove
+                    </Button>
+                  </div>
                 </div>
               ))
             )}

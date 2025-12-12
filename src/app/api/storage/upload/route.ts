@@ -19,16 +19,17 @@ export async function POST(req: NextRequest) {
 
     const bucketInfo = await admin.storage.getBucket(bucket)
     if (!bucketInfo?.data) {
-      await admin.storage.createBucket(bucket, { public: true, fileSizeLimit: '50MB' })
-    } else if (bucketInfo.data && bucketInfo.data.public === false) {
-      await admin.storage.updateBucket(bucket, { public: true })
+      await admin.storage.createBucket(bucket, { public: true, fileSizeLimit: '200MB' })
+    } else {
+      await admin.storage.updateBucket(bucket, { public: true, fileSizeLimit: '200MB' })
     }
 
     const ab = await file.arrayBuffer()
     const bytes = new Uint8Array(ab)
-    let { error } = await admin.storage.from(bucket).upload(path, bytes, { upsert: false, contentType: file.type || 'application/octet-stream' })
+    const ct = file.type || (ext === 'mp4' ? 'video/mp4' : ext === 'webm' ? 'video/webm' : 'application/octet-stream')
+    let { error } = await admin.storage.from(bucket).upload(path, bytes, { upsert: false, contentType: ct })
     if (error) {
-      const alt = await admin.storage.from('images').upload(path, bytes, { upsert: false, contentType: file.type || 'application/octet-stream' })
+      const alt = await admin.storage.from('images').upload(path, bytes, { upsert: false, contentType: ct })
       if (alt.error) {
         return new Response(JSON.stringify({ error: alt.error.message || error.message, details: { triedBucket: bucket, triedAltBucket: 'images', contentType: file.type || 'application/octet-stream' } }), { status: 400 })
       }
