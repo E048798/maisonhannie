@@ -56,14 +56,17 @@ export default function Admin() {
     setLoginLoading(false);
     if (error) {
       setLoginError(error.message);
+      showToast('Login failed', 'error');
       return;
     }
     await checkAuth();
+    showToast('Logged in', 'success');
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
     setIsAuthenticated(false);
+    showToast('Logged out', 'success');
   }
 
   const [orders, setOrders] = useState<any[]>([]);
@@ -94,10 +97,17 @@ export default function Admin() {
       city: order.city || '',
       state: order.state || '',
     });
+    showToast('Editing order', 'success');
   }
 
   function openViewOrder(order: any) {
     setViewOrder(order);
+    showToast('Opening order', 'success');
+  }
+
+  function openReceiptConfirm(order: any) {
+    setReceiptConfirmOrder(order);
+    showToast('Open receipt dialog', 'success');
   }
 
   async function issueReceipt(order: any) {
@@ -110,22 +120,23 @@ export default function Admin() {
           tracking_code: order.tracking_code,
           items: (order.items || []).map((it: any) => ({ name: it.name, quantity: Number(it.quantity || 1), price: Number(it.price || 0) })),
           total: Number(order.total || 0),
+          phone: order.phone || '',
+          address: order.address || '',
+          city: order.city || '',
+          state: order.state || '',
         }
       };
       const resp = await fetch('/api/admin/receipt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!resp.ok) {
         const t = await resp.text();
         console.error('Receipt error', t);
-        setReceiptToast({ type: 'error', message: 'Failed to email receipt' });
-        setTimeout(() => setReceiptToast(null), 3000);
+        showToast('Failed to email receipt', 'error');
       } else {
-        setReceiptToast({ type: 'success', message: 'Receipt sent' });
-        setTimeout(() => setReceiptToast(null), 3000);
+        showToast('Receipt sent', 'success');
       }
     } catch (e) {
       console.error(e);
-      setReceiptToast({ type: 'error', message: 'Error issuing receipt' });
-      setTimeout(() => setReceiptToast(null), 3000);
+      showToast('Error issuing receipt', 'error');
     } finally {
       setIssuingReceiptId(null);
     }
@@ -150,6 +161,9 @@ export default function Admin() {
       setOrders((prev) => prev.map((o) => (o.id === editingOrderId ? { ...o, ...updates } : o)));
       setEditingOrderId(null);
       setEditingOrder(null);
+      showToast('Order updated', 'success');
+    } else {
+      showToast('Failed to update order', 'error');
     }
   }
 
@@ -161,6 +175,9 @@ export default function Admin() {
     });
     if (resp.ok) {
       setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      showToast('Order deleted', 'success');
+    } else {
+      showToast('Failed to delete order', 'error');
     }
   }
 
@@ -186,12 +203,15 @@ export default function Admin() {
       setNewOrder({ name: '', email: '', phone: '', address: '', city: '', state: '' });
       setNewOrderItems([]);
       setOrderPage(1);
+      showToast('Order created', 'success');
       try {
         const r = await fetch(`/api/admin/orders/list?page=1&limit=${orderLimit}`);
         const j = await r.json();
         setOrders(Array.isArray(j?.orders) ? j.orders : []);
         setOrderTotal(Number(j?.total || 0));
       } catch {}
+    } else {
+      showToast('Failed to create order', 'error');
     }
   }
 
@@ -247,6 +267,7 @@ export default function Admin() {
         });
       }
     } catch {}
+    showToast(`Status updated to ${newStatus}`, 'success');
   }
 
   const [settings, setSettings] = useState({ showBlog: true, showShop: true, showCatering: true, showResin: true, showBeads: true, showTailor: true, emailNotifications: true, orderAlerts: true });
@@ -286,6 +307,7 @@ export default function Admin() {
       const { data } = await supabase.from('site_settings').insert({ allow_public_reviews: checked }).select('id').limit(1);
       if (data && data.length) setSettingsId(data[0].id as number);
     }
+    showToast('Reviews setting updated', 'success');
   }
 
   async function updateSettingFlag(key: keyof typeof settings, checked: boolean) {
@@ -308,6 +330,7 @@ export default function Admin() {
       const { data } = await supabase.from('site_settings').insert({ [column]: checked } as any).select('id').limit(1);
       if (data && data.length) setSettingsId(data[0].id as number);
     }
+    showToast('Setting updated', 'success');
   }
 
   type ProductAdmin = {
@@ -381,7 +404,12 @@ export default function Admin() {
     setConfirmDialog({ open: true, message, onConfirm });
   }
 
-  const [contactInfo, setContactInfo] = useState<any>({ address: '', phone: '', email: '', instagram_url: '', facebook_url: '', twitter_url: '' });
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    setReceiptToast({ type, message });
+    setTimeout(() => setReceiptToast(null), 3000);
+  }
+
+  const [contactInfo, setContactInfo] = useState<any>({ address: '', phone: '', email: '', site_url: '', instagram_url: '', facebook_url: '', twitter_url: '' });
   const [contactLoaded, setContactLoaded] = useState(false);
   const [hours, setHours] = useState<any[]>([]);
   const [hoursLoaded, setHoursLoaded] = useState(false);
@@ -420,17 +448,14 @@ export default function Admin() {
       if (!resp.ok) {
         const t = await resp.text();
         console.error('Delete failed', t);
-        setReceiptToast({ type: 'error', message: 'Failed to delete product' });
-        setTimeout(() => setReceiptToast(null), 3000);
+        showToast('Failed to delete product', 'error');
       } else {
         setProducts((prev) => prev.filter((p) => String(p.id) !== String(prod?.id) && String(p.name) !== String(prod?.name)));
-        setReceiptToast({ type: 'success', message: 'Product deleted' });
-        setTimeout(() => setReceiptToast(null), 3000);
+        showToast('Product deleted', 'success');
       }
     } catch (e) {
       console.error(e);
-      setReceiptToast({ type: 'error', message: 'Error deleting product' });
-      setTimeout(() => setReceiptToast(null), 3000);
+      showToast('Error deleting product', 'error');
     }
   }
 
@@ -457,6 +482,9 @@ export default function Admin() {
       setProducts((prev) => [...prev, { ...(inserted as any), visible: true }]);
       setNewProduct({ name: '', price: '', category: 'Resin Works', description: '', image: '', featured: false, ready_made: true, lead_time_value: '', lead_time_unit: 'days' });
       setShowAddProduct(false);
+      showToast('Product added', 'success');
+    } else {
+      showToast('Failed to add product', 'error');
     }
     setAddProductSaving(false);
   }
@@ -505,6 +533,7 @@ export default function Admin() {
     setEditingProductId(null);
     setEditingData(null);
     setEditSaving(false);
+    showToast('Product updated', 'success');
   }
 
   function cancelEditProduct() {
@@ -520,7 +549,8 @@ export default function Admin() {
       fd.append('bucket', 'Images');
       const res = await fetch('/api/storage/upload', { method: 'POST', body: fd });
       const json = await res.json();
-      if (!res.ok) { alert(String(json?.error || 'Upload failed')); return ''; }
+      if (!res.ok) { showToast(String(json?.error || 'Upload failed'), 'error'); return ''; }
+      showToast('Upload complete', 'success');
       return String(json.url || '');
     } catch { return ''; }
   }
@@ -603,11 +633,13 @@ export default function Admin() {
 
 function toggleBlogVisibility(id: number | string) {
   setBlogs((prev) => prev.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)));
+  showToast('Blog visibility updated', 'success');
 }
 
 async function deleteBlog(id: number | string) {
   try { await supabase.from('blog_posts').delete().eq('id', id); } catch {}
   setBlogs((prev) => prev.filter((b) => b.id !== id));
+  showToast('Blog deleted', 'success');
 }
 
 async function addBlog() {
@@ -624,7 +656,7 @@ async function addBlog() {
     async function loadContact() {
       if (!isAuthenticated) return;
       const { data: c } = await supabase.from('contact_info').select('*').order('updated_at', { ascending: false }).limit(1);
-      setContactInfo(c && c[0] ? c[0] : { address: '', phone: '', email: '', instagram_url: '', facebook_url: '', twitter_url: '' });
+      setContactInfo(c && c[0] ? c[0] : { address: '', phone: '', email: '', site_url: '', instagram_url: '', facebook_url: '', twitter_url: '' });
       setContactLoaded(true);
       const { data: h } = await supabase.from('business_hours').select('*').order('display_order', { ascending: true });
       setHours(h || []);
@@ -697,6 +729,7 @@ async function addBlog() {
       address: contactInfo.address || '',
       phone: contactInfo.phone || '',
       email: contactInfo.email || '',
+      site_url: contactInfo.site_url || '',
       instagram_url: contactInfo.instagram_url || '',
       facebook_url: contactInfo.facebook_url || '',
       twitter_url: contactInfo.twitter_url || '',
@@ -708,6 +741,7 @@ async function addBlog() {
       if (data && data[0]) setContactInfo(data[0]);
     }
     setContactSaving(false);
+    showToast('Contact info saved', 'success');
   }
 
   async function addVoucher() {
@@ -733,6 +767,9 @@ async function addBlog() {
       setVouchers((prev) => [inserted, ...prev]);
       setShowAddVoucher(false);
       setNewVoucher({ code: '', discount_type: 'percent', discount_value: '', min_order_amount: '', start_date: '', end_date: '', usage_limit: '', active: true, first_time_only: false, single_use_per_customer: false, applicable_categories: '', max_discount: '', note: '' });
+      showToast('Voucher added', 'success');
+    } else {
+      showToast('Failed to add voucher', 'error');
     }
   }
 
@@ -742,6 +779,7 @@ async function addBlog() {
     if (!error) {
       const updated = data && data[0] ? data[0] : { ...v, active: next };
       setVouchers((prev) => prev.map((x) => (x.id === v.id ? updated : x)));
+      showToast(next ? 'Voucher activated' : 'Voucher deactivated', 'success');
     }
   }
 
@@ -786,6 +824,9 @@ async function addBlog() {
       setVouchers((prev) => prev.map((x) => (x.id === editingVoucherId ? { ...x, ...payload } : x)));
       setEditingVoucherId(null);
       setEditingVoucher(null);
+      showToast('Voucher updated', 'success');
+    } else {
+      showToast('Failed to update voucher', 'error');
     }
   }
 
@@ -793,13 +834,15 @@ async function addBlog() {
     const { error } = await supabase.from('vouchers').delete().eq('id', v.id);
     if (!error) {
       setVouchers((prev) => prev.filter((x) => x.id !== v.id));
+      showToast('Voucher deleted', 'success');
     }
   }
 
-  async function deleteInquiryRow(q: any) {
-    await supabase.from('catering_inquiries').delete().eq('id', q.id);
-    setInquiries((prev) => prev.filter((x) => x.id !== q.id));
-  }
+async function deleteInquiryRow(q: any) {
+  await supabase.from('catering_inquiries').delete().eq('id', q.id);
+  setInquiries((prev) => prev.filter((x) => x.id !== q.id));
+  showToast('Inquiry deleted', 'success');
+}
 
   function editBusinessHour(id: number | string) {
     const h = hours.find((x) => x.id === id);
@@ -819,6 +862,7 @@ async function addBlog() {
     setEditingHourId(null);
     setEditingHour(null);
     setBusinessHourSaving(false);
+    showToast('Business hours updated', 'success');
   }
 
   function cancelEditBusinessHour() {
@@ -986,7 +1030,7 @@ async function addBlog() {
                             <div className="flex flex-wrap items-center gap-2">
                               <button onClick={() => openViewOrder(order)} className="p-2 rounded-lg hover:bg-gray-100"><Eye className="w-4 h-4" /></button>
                               <button onClick={() => openEditOrder(order)} className="p-2 rounded-lg hover:bg-gray-100"><Pencil className="w-4 h-4" /></button>
-                              <button onClick={() => setReceiptConfirmOrder(order)} disabled={issuingReceiptId === order.id} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50">
+                              <button onClick={() => openReceiptConfirm(order)} disabled={issuingReceiptId === order.id} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50">
                                 {issuingReceiptId === order.id ? (<Loader2 className="w-4 h-4 animate-spin" />) : (<FileText className="w-4 h-4" />)}
                               </button>
                               <button onClick={() => openConfirm(`Delete order ${order.tracking_code}?`, () => deleteOrder(order))} className="p-2 rounded-lg hover:bg-red-50 text-red-500"><Trash2 className="w-4 h-4" /></button>
@@ -1698,6 +1742,7 @@ async function addBlog() {
                     <Input placeholder="Address" value={contactInfo.address || ''} onChange={(e) => setContactInfo({ ...contactInfo, address: e.target.value })} />
                     <Input placeholder="Phone" value={contactInfo.phone || ''} onChange={(e) => setContactInfo({ ...contactInfo, phone: e.target.value })} />
                     <Input placeholder="Email" value={contactInfo.email || ''} onChange={(e) => setContactInfo({ ...contactInfo, email: e.target.value })} />
+                    <Input placeholder="Website URL (e.g., maisonhannie.store)" value={contactInfo.site_url || ''} onChange={(e) => setContactInfo({ ...contactInfo, site_url: e.target.value })} />
                     <Input placeholder="Instagram URL" value={contactInfo.instagram_url || ''} onChange={(e) => setContactInfo({ ...contactInfo, instagram_url: e.target.value })} />
                     <Input placeholder="Facebook URL" value={contactInfo.facebook_url || ''} onChange={(e) => setContactInfo({ ...contactInfo, facebook_url: e.target.value })} />
                     <Input placeholder="Twitter URL" value={contactInfo.twitter_url || ''} onChange={(e) => setContactInfo({ ...contactInfo, twitter_url: e.target.value })} />
@@ -2042,26 +2087,23 @@ async function addBlog() {
       }
       setShowEmailModal(false);
       if (anyOk && !anyErr) {
-        setReceiptToast({ type: 'success', message: 'Emails sent' });
+        showToast('Emails sent', 'success');
       } else if (anyOk && anyErr) {
-        setReceiptToast({ type: 'error', message: 'Some emails failed to send' });
+        showToast('Some emails failed to send', 'error');
       } else {
-        setReceiptToast({ type: 'error', message: 'Failed to send emails' });
+        showToast('Failed to send emails', 'error');
       }
-      setTimeout(() => setReceiptToast(null), 3000);
       return;
     }
     const recipients = emailDraft.to.split(',').map((s) => s.trim()).filter(Boolean);
     const resp = await fetch('/api/admin/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: recipients, subject: emailDraft.subject, html: `${emailDraft.html}${attachBlock}`, attachments: (emailDraft.attachments || []).map((a) => ({ filename: a.name, content: '', path: a.url })) }) });
     if (resp.ok) {
       setShowEmailModal(false);
-      setReceiptToast({ type: 'success', message: 'Email sent' });
-      setTimeout(() => setReceiptToast(null), 3000);
+      showToast('Email sent', 'success');
     } else {
       const t = await resp.text();
       console.error('Email send error', t);
-      setReceiptToast({ type: 'error', message: 'Failed to send email' });
-      setTimeout(() => setReceiptToast(null), 3000);
+      showToast('Failed to send email', 'error');
     }
   }
 
@@ -2078,13 +2120,11 @@ async function addBlog() {
     });
     if (resp.ok) {
       setShowContactEmailModal(false);
-      setReceiptToast({ type: 'success', message: 'Email sent' });
-      setTimeout(() => setReceiptToast(null), 3000);
+      showToast('Email sent', 'success');
     } else {
       const t = await resp.text();
       console.error('Email send error', t);
-      setReceiptToast({ type: 'error', message: 'Failed to send email' });
-      setTimeout(() => setReceiptToast(null), 3000);
+      showToast('Failed to send email', 'error');
     }
   }
 }
