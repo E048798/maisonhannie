@@ -142,7 +142,7 @@ export default function Shop() {
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="flex justify-center mb-8">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-white/80 backdrop-blur-sm p-1 rounded-full">
+            <TabsList className="bg-white/80 backdrop-blur-sm p-1 rounded-full flex flex-wrap gap-2 justify-center">
               <TabsTrigger value="all" className="rounded-full data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white px-6">All</TabsTrigger>
               <TabsTrigger value="resin" className="rounded-full data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white px-6">Resin</TabsTrigger>
               <TabsTrigger value="beads" className="rounded-full data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white px-6">Beads</TabsTrigger>

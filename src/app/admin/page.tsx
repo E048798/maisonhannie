@@ -370,6 +370,12 @@ export default function Admin() {
   const [inqLimit, setInqLimit] = useState(10);
   const [inqTotal, setInqTotal] = useState(0);
   const [inquirySearch, setInquirySearch] = useState('');
+  const [contactMessages, setContactMessages] = useState<any[]>([]);
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactStatusFilter, setContactStatusFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const [selectedContacts, setSelectedContacts] = useState<Record<string, boolean>>({});
+  const [viewContact, setViewContact] = useState<any | null>(null);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<any[]>([]);
   const [newsletterSearch, setNewsletterSearch] = useState('');
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -723,6 +729,55 @@ async function addBlog() {
     loadNewsletter();
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    async function loadContactMessages() {
+      if (!isAuthenticated) return;
+      setContactLoading(true);
+      const { data } = await supabase
+        .from('contact_messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+      setContactMessages(data || []);
+      setContactLoading(false);
+    }
+    loadContactMessages();
+  }, [isAuthenticated]);
+
+  async function updateContactStatus(row: any, status: 'open' | 'resolved') {
+    try {
+      await supabase.from('contact_messages').update({ status }).eq('id', row.id);
+      setContactMessages((prev) => prev.map((r) => (r.id === row.id ? { ...r, status } : r)));
+      showToast('Contact status updated', 'success');
+    } catch {
+      showToast('Failed to update status', 'error');
+    }
+  }
+
+  function toggleSelectContact(id: string | number, checked: boolean) {
+    setSelectedContacts((prev) => ({ ...prev, [String(id)]: checked }));
+  }
+
+  async function addSelectedToNewsletter() {
+    const selected = contactMessages.filter((c) => selectedContacts[String(c.id)]);
+    if (!selected.length) return;
+    const existing = new Set((newsletterSubscribers || []).map((s: any) => String(s.email).toLowerCase()));
+    const toInsert = selected
+      .filter((c) => !!c.email)
+      .filter((c) => !existing.has(String(c.email).toLowerCase()))
+      .map((c) => ({ email: c.email, name: c.name || null }));
+    if (!toInsert.length) { showToast('No new contacts to add', 'error'); return; }
+    const { error } = await supabase.from('newsletter_subscriptions').insert(toInsert);
+    if (!error) {
+      showToast('Added to newsletter', 'success');
+      try {
+        const { data } = await supabase.from('newsletter_subscriptions').select('*').order('created_at', { ascending: false });
+        setNewsletterSubscribers(data || []);
+      } catch {}
+    } else {
+      showToast('Failed to add to newsletter', 'error');
+    }
+  }
+
   async function saveContactInfoAdmin() {
     setContactSaving(true);
     const payload = {
@@ -929,6 +984,9 @@ async function deleteInquiryRow(q: any) {
             </TabsTrigger>
             <TabsTrigger value="blog" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <FileText className="w-4 h-4 mr-2" /> Blog
+            </TabsTrigger>
+            <TabsTrigger value="contact_messages" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
+              <Mail className="w-4 h-4 mr-2" /> Contact Submissions
             </TabsTrigger>
             <TabsTrigger value="contact" className="rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white">
               <Mail className="w-4 h-4 mr-2" /> Contact
@@ -1189,7 +1247,7 @@ async function deleteInquiryRow(q: any) {
                 <Input className="w-full sm:w-64" placeholder="Search inquiries" value={inquirySearch} onChange={(e) => setInquirySearch(e.target.value)} />
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="flex flex-wrap gap-3">
                   {inquiriesLoading ? (
                     <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" /></div>
                   ) : inquiries.length === 0 ? (
@@ -1440,7 +1498,7 @@ async function deleteInquiryRow(q: any) {
                       const fields = [v.code, v.discount_type, v.note];
                       return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
                     }).map((v) => (
-                      <div key={v.id || v.code} className="p-4 bg-white rounded-xl border">
+                      <div key={v.id || v.code} className="p-4 bg-white rounded-xl border w-full sm:w-[22rem]">
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-black">{v.code}</p>
@@ -1723,6 +1781,87 @@ async function deleteInquiryRow(q: any) {
                 <div className="flex items-center gap-2">
                   <Button onClick={saveEditBlog} className="bg-green-600 hover:bg-green-700 text-white"><Save className="w-4 h-4 mr-2" /> Save</Button>
                   <Button onClick={() => { setEditingBlogId(null); setEditingBlog(null); }} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Cancel</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <TabsContent value="contact_messages">
+            <Card>
+              <CardHeader className="flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
+                <CardTitle>Contact Submissions</CardTitle>
+                <div className="flex w-full sm:w-auto items-center gap-2">
+                  <Input className="w-full sm:w-64" placeholder="Search contacts" value={contactSearch} onChange={(e) => setContactSearch(e.target.value)} />
+                  <Select value={contactStatusFilter} onValueChange={(v) => setContactStatusFilter(v as any)}>
+                    <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={addSelectedToNewsletter} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">Add to Newsletter</Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {contactLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" /></div>
+                ) : contactMessages.length === 0 ? (
+                  <div className="text-center py-8 text-black/60">No contact messages yet</div>
+                ) : (
+                  <div className="space-y-3">
+                    {contactMessages
+                      .filter((c) => {
+                        const q = contactSearch.toLowerCase().trim();
+                        const okSearch = !q || [c.name, c.email, c.message].some((v: any) => String(v || '').toLowerCase().includes(q));
+                        const okStatus = contactStatusFilter === 'all' || String(c.status || 'open') === contactStatusFilter;
+                        return okSearch && okStatus;
+                      })
+                      .map((c) => (
+                        <div key={c.id} className="p-4 bg-white rounded-xl border flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <input type="checkbox" checked={!!selectedContacts[String(c.id)]} onChange={(e) => toggleSelectContact(c.id, e.target.checked)} />
+                            <div className="min-w-0">
+                              <p className="font-medium text-black">{c.name}</p>
+                              <p className="text-sm text-black/60">{c.email}</p>
+                              <p className="text-xs text-black/50">{c.created_at ? new Date(c.created_at).toLocaleString() : ''}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Select value={String(c.status || 'open')} onValueChange={(v) => updateContactStatus(c, v as any)}>
+                              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">Open</SelectItem>
+                                <SelectItem value="resolved">Resolved</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <button onClick={() => setViewContact(c)} className="p-2 rounded-lg hover:bg-gray-100"><Eye className="w-4 h-4" /></button>
+                            <button onClick={() => {
+                              setContactEmailDraft({ to: String(c.email || ''), subject: `Re: Your message`, html: `<p>Hi ${c.name || ''},</p><p>Thanks for contacting us. We’ll reply shortly.</p>`, attachments: [] });
+                              setShowContactEmailModal(true);
+                            }} className="p-2 rounded-lg hover:bg-gray-100"><Mail className="w-4 h-4" /></button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {viewContact && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-lg max-h-[85vh] overflow-y-auto">
+                <h3 className="text-xl font-semibold text-black mb-4">Contact Message</h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="font-medium">Name:</span> {viewContact.name}</p>
+                  <p><span className="font-medium">Email:</span> {viewContact.email}</p>
+                  <p><span className="font-medium">Phone:</span> {viewContact.phone || '-'}</p>
+                  <p><span className="font-medium">Message:</span></p>
+                  <div className="p-3 bg-[#F7F3EC] rounded text-black/80 whitespace-pre-line">{viewContact.message || '-'}</div>
+                </div>
+                <div className="flex items-center gap-2 mt-4">
+                  <Button onClick={() => setViewContact(null)} className="bg-black hover:bg-black/90 text-white"><X className="w-4 h-4 mr-2" /> Close</Button>
                 </div>
               </div>
             </div>
@@ -2125,6 +2264,6 @@ async function deleteInquiryRow(q: any) {
       const t = await resp.text();
       console.error('Email send error', t);
       showToast('Failed to send email', 'error');
-    }
+  }
   }
 }

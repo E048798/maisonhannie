@@ -15,28 +15,73 @@ export async function POST(req: Request) {
     const fromName = process.env.RESEND_FROM_NAME || 'Maison Hannie';
     const from = `${fromName} <${fromEmail}>`;
 
-    // 1) Send autoresponder to user
-    const userSubject = 'We received your message';
-    const userHtml = `
-      <div style="font-family: Arial, sans-serif; line-height:1.6;">
-        <h2>Thanks for contacting us${name ? ', ' + name : ''}.</h2>
-        <p>We have received your message and will get back to you within 24 hours.</p>
-        <p>Warm regards,<br/>Maison Hannie</p>
-      </div>
-    `;
-
+    let admin: any = null;
     try {
-      const resp = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ from, to: email, subject: userSubject, html: userHtml }),
-      });
-      // Best-effort: proceed even if autoresponder fails
-      await resp.text();
+      const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) as string;
+      const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY || (process.env as any).SUPABASE_SERVICE_ROLE) as string | undefined;
+      if (url && serviceRole) {
+        const { createClient } = await import('@supabase/supabase-js');
+        admin = createClient(url, serviceRole);
+      }
     } catch {}
+
+    let skipUser = false;
+    try {
+      if (admin) {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: prior } = await admin
+          .from('contact_messages')
+          .select('id')
+          .eq('email', email)
+          .eq('email_sent', true)
+          .gte('created_at', since)
+          .limit(1);
+        skipUser = !!(prior && prior.length);
+      }
+    } catch {}
+
+    if (!skipUser) {
+      const userSubject = 'We received your message';
+      const userHtml = `
+        <div style="font-family: Arial, sans-serif; line-height:1.6;">
+          <h2>Thanks for contacting us${name ? ', ' + name : ''}.</h2>
+          <p>We have received your message and will get back to you within 24 hours.</p>
+          <p>Warm regards,<br/>Maison Hannie</p>
+        </div>
+      `;
+
+      let sentOk = false;
+      try {
+        const resp = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ from, to: email, subject: userSubject, html: userHtml }),
+        });
+        await resp.text();
+        sentOk = true;
+      } catch {}
+
+      try {
+        if (admin) {
+          const { data: latest } = await admin
+            .from('contact_messages')
+            .select('id')
+            .eq('email', email)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          const id = latest && latest[0]?.id;
+          if (id) {
+            await admin
+              .from('contact_messages')
+              .update({ email_sent: sentOk })
+              .eq('id', id);
+          }
+        }
+      } catch {}
+    }
 
     // 2) Notify admins
     const adminRecipients = [
@@ -74,7 +119,7 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: 'Email service unavailable' }), { status: 502 });
     }
 
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
+    return new Response(JSON.stringify({ success: true, deduped: skipUser }), { status: 200 });
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 });
   }
