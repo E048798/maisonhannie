@@ -1673,7 +1673,7 @@ async function deleteInquiryRow(q: any) {
                           <h4 className="font-medium text-black truncate">{product.name}</h4>
                           {product.featured && <Badge className="bg-[#D4AF37]/20 text-[#D4AF37]">Featured</Badge>}
                         </div>
-                        <p className="text-sm text-black/60">{product.category} · ${product.price}</p>
+                        <p className="text-sm text-black/60">{product.category} · ₦{Number(product.price || 0).toLocaleString()}</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <button onClick={() => toggleProductFeatured(product.id)} className={cn('p-2 rounded-lg transition-colors', product.featured ? 'bg-[#D4AF37]/20 text-[#D4AF37]' : 'hover:bg-gray-100 text-gray-400')}>
