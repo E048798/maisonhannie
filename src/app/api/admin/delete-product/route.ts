@@ -14,10 +14,24 @@ export async function POST(req: Request) {
     const admin = createClient(url, serviceRole);
 
     if (id != null) {
-      const { error } = await admin.from('products').delete().eq('id', id as any);
+      const pid = id as any;
+      const { error: reviewsError } = await admin.from('reviews').delete().eq('product_id', pid);
+      if (reviewsError) return new Response(JSON.stringify({ error: reviewsError.message }), { status: 500 });
+
+      const { error } = await admin.from('products').delete().eq('id', pid);
       if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
       return new Response(JSON.stringify({ ok: true }));
     }
+
+    const { data: products, error: fetchError } = await admin.from('products').select('id').eq('name', name);
+    if (fetchError) return new Response(JSON.stringify({ error: fetchError.message }), { status: 500 });
+
+    const ids = (products || []).map((p: any) => p.id);
+    if (ids.length) {
+      const { error: reviewsError } = await admin.from('reviews').delete().in('product_id', ids as any);
+      if (reviewsError) return new Response(JSON.stringify({ error: reviewsError.message }), { status: 500 });
+    }
+
     const { error } = await admin.from('products').delete().eq('name', name);
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     return new Response(JSON.stringify({ ok: true }));

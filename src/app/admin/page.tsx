@@ -75,6 +75,7 @@ export default function Admin() {
   const [orderLimit, setOrderLimit] = useState(10);
   const [orderTotal, setOrderTotal] = useState(0);
   const [orderSearch, setOrderSearch] = useState('');
+  const [selectedOrders, setSelectedOrders] = useState<Record<string, boolean>>({});
 
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [newOrder, setNewOrder] = useState<any>({ name: '', email: '', phone: '', address: '', city: '', state: '' });
@@ -178,6 +179,40 @@ export default function Admin() {
       showToast('Order deleted', 'success');
     } else {
       showToast('Failed to delete order', 'error');
+    }
+  }
+
+  function toggleSelectOrder(id: string | number, checked: boolean) {
+    setSelectedOrders((prev) => ({ ...prev, [String(id)]: checked }));
+  }
+
+  async function deleteSelectedOrders() {
+    const selected = orders.filter((o) => selectedOrders[String(o.id)]);
+    if (!selected.length) return;
+    let anyOk = false;
+    let anyErr = false;
+    for (const order of selected) {
+      try {
+        const resp = await fetch('/api/admin/orders/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: order.id })
+        });
+        if (resp.ok) anyOk = true; else anyErr = true;
+      } catch {
+        anyErr = true;
+      }
+    }
+    if (anyOk) {
+      setOrders((prev) => prev.filter((o) => !selectedOrders[String(o.id)]));
+      setSelectedOrders({});
+    }
+    if (anyOk && !anyErr) {
+      showToast('Selected orders deleted', 'success');
+    } else if (anyOk && anyErr) {
+      showToast('Some orders failed to delete', 'error');
+    } else {
+      showToast('Failed to delete orders', 'error');
     }
   }
 
@@ -364,6 +399,49 @@ export default function Admin() {
 
   const [products, setProducts] = useState<ProductAdmin[]>(allProducts.map((p) => ({ ...(p as any), visible: true })));
   const [blogs, setBlogs] = useState<BlogAdmin[]>(blogPosts.map((b) => ({ ...(b as any), visible: true })));
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
+  const [selectedBlogs, setSelectedBlogs] = useState<Record<string, boolean>>({});
+  const [selectedInquiries, setSelectedInquiries] = useState<Record<string, boolean>>({});
+  const [selectedVouchers, setSelectedVouchers] = useState<Record<string, boolean>>({});
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  function toggleSelectInquiry(id: string | number, checked: boolean) {
+    setSelectedInquiries((prev) => ({ ...prev, [String(id)]: checked }));
+  }
+
+  async function deleteSelectedInquiries() {
+    const ids = inquiries.filter((q) => selectedInquiries[String(q.id)]).map((q) => q.id);
+    if (!ids.length) return;
+    const { error } = await supabase.from('catering_inquiries').delete().in('id', ids);
+    if (!error) {
+      setInquiries((prev) => prev.filter((q) => !selectedInquiries[String(q.id)]));
+      setSelectedInquiries({});
+      showToast('Selected inquiries deleted', 'success');
+    } else {
+      showToast('Failed to delete inquiries', 'error');
+    }
+  }
+
+  function toggleSelectVoucher(id: string | number, checked: boolean) {
+    setSelectedVouchers((prev) => ({ ...prev, [String(id)]: checked }));
+  }
+
+  async function deleteSelectedVouchers() {
+    const ids = vouchers.filter((v) => selectedVouchers[String(v.id)]).map((v) => v.id);
+    if (!ids.length) return;
+    const { error } = await supabase.from('vouchers').delete().in('id', ids);
+    if (!error) {
+      setVouchers((prev) => prev.filter((v) => !selectedVouchers[String(v.id)]));
+      setSelectedVouchers({});
+      showToast('Selected vouchers deleted', 'success');
+    } else {
+      showToast('Failed to delete vouchers', 'error');
+    }
+  }
   const [inquiries, setInquiries] = useState<any[]>([]);
   const [inquiriesLoading, setInquiriesLoading] = useState(false);
   const [inqPage, setInqPage] = useState(1);
@@ -462,6 +540,40 @@ export default function Admin() {
     } catch (e) {
       console.error(e);
       showToast('Error deleting product', 'error');
+    }
+  }
+
+  function toggleSelectProduct(id: number | string, checked: boolean) {
+    setSelectedProducts((prev) => ({ ...prev, [String(id)]: checked }));
+  }
+
+  async function deleteSelectedProducts() {
+    const selected = products.filter((p) => selectedProducts[String(p.id)]);
+    if (!selected.length) return;
+    let anyOk = false;
+    let anyErr = false;
+    for (const prod of selected) {
+      try {
+        const resp = await fetch('/api/admin/delete-product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: prod.id, name: prod.name })
+        });
+        if (resp.ok) anyOk = true; else anyErr = true;
+      } catch {
+        anyErr = true;
+      }
+    }
+    if (anyOk) {
+      setProducts((prev) => prev.filter((p) => !selectedProducts[String(p.id)]));
+      setSelectedProducts({});
+    }
+    if (anyOk && !anyErr) {
+      showToast('Selected products deleted', 'success');
+    } else if (anyOk && anyErr) {
+      showToast('Some products failed to delete', 'error');
+    } else {
+      showToast('Failed to delete products', 'error');
     }
   }
 
@@ -638,14 +750,43 @@ export default function Admin() {
   }
 
 function toggleBlogVisibility(id: number | string) {
-  setBlogs((prev) => prev.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)));
-  showToast('Blog visibility updated', 'success');
+	setBlogs((prev) => prev.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)));
+	showToast('Blog visibility updated', 'success');
 }
 
 async function deleteBlog(id: number | string) {
-  try { await supabase.from('blog_posts').delete().eq('id', id); } catch {}
-  setBlogs((prev) => prev.filter((b) => b.id !== id));
-  showToast('Blog deleted', 'success');
+	try {
+		const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+		if (error) {
+			showToast('Failed to delete post', 'error');
+			return;
+		}
+		setBlogs((prev) => prev.filter((b) => b.id !== id));
+		showToast('Blog deleted', 'success');
+	} catch {
+		showToast('Failed to delete post', 'error');
+	}
+}
+
+function toggleSelectBlog(id: number | string, checked: boolean) {
+  setSelectedBlogs((prev) => ({ ...prev, [String(id)]: checked }));
+}
+
+async function deleteSelectedBlogs() {
+	const ids = blogs.filter((b) => selectedBlogs[String(b.id)]).map((b) => b.id);
+	if (!ids.length) return;
+	try {
+		const { error } = await supabase.from('blog_posts').delete().in('id', ids as any);
+		if (error) {
+			showToast('Failed to delete posts', 'error');
+			return;
+		}
+		setBlogs((prev) => prev.filter((b) => !selectedBlogs[String(b.id)]));
+		setSelectedBlogs({});
+		showToast('Selected posts deleted', 'success');
+	} catch {
+		showToast('Failed to delete posts', 'error');
+	}
 }
 
 async function addBlog() {
@@ -775,6 +916,44 @@ async function addBlog() {
       } catch {}
     } else {
       showToast('Failed to add to newsletter', 'error');
+    }
+  }
+
+  async function deleteSelectedContacts() {
+    const selected = contactMessages.filter((c) => selectedContacts[String(c.id)]);
+    if (!selected.length) return;
+    const ids = selected.map((c) => c.id);
+    try {
+      const { error } = await supabase.from('contact_messages').delete().in('id', ids as any[]);
+      if (error) {
+        showToast('Failed to delete contacts', 'error');
+        return;
+      }
+      setContactMessages((prev) => prev.filter((c) => !selectedContacts[String(c.id)]));
+      setSelectedContacts({});
+      showToast('Selected contacts deleted', 'success');
+    } catch {
+      showToast('Failed to delete contacts', 'error');
+    }
+  }
+
+  const [selectedNewsletter, setSelectedNewsletter] = useState<Record<string, boolean>>({});
+
+  function toggleSelectNewsletter(id: string | number, checked: boolean) {
+    setSelectedNewsletter((prev) => ({ ...prev, [String(id)]: checked }));
+  }
+
+  async function deleteSelectedNewsletter() {
+    const selected = newsletterSubscribers.filter((s) => selectedNewsletter[String(s.id)]);
+    if (!selected.length) return;
+    const ids = selected.map((s) => s.id);
+    const { error } = await supabase.from('newsletter_subscriptions').delete().in('id', ids);
+    if (!error) {
+      setNewsletterSubscribers((prev) => prev.filter((s) => !selectedNewsletter[String(s.id)]));
+      setSelectedNewsletter({});
+      showToast('Selected subscribers deleted', 'success');
+    } else {
+      showToast('Failed to delete subscribers', 'error');
     }
   }
 
@@ -1021,6 +1200,7 @@ async function deleteInquiryRow(q: any) {
               </SelectContent>
             </Select>
           </div>
+          <Button onClick={deleteSelectedOrders} className="bg-red-600 hover:bg-red-700 text-white">Delete Selected</Button>
           <Button onClick={() => setShowCreateOrder(true)} className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C4A030] text-white"><Plus className="w-4 h-4 mr-2" /> Create Order</Button>
         </div>
       </CardHeader>
@@ -1042,14 +1222,17 @@ async function deleteInquiryRow(q: any) {
                     }).map((order) => (
                         <div key={order.id} className={cn('p-4 bg-white rounded-xl border', order.status === 'pending' ? 'border-yellow-300 bg-yellow-50' : '')}>
                           <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                            <div>
-                              <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
-                              <p className="font-medium text-black">{order.customer_name}</p>
-                              <p className="text-sm text-black/60">{order.phone}</p>
+                            <div className="flex items-start gap-3">
+                              <input type="checkbox" checked={!!selectedOrders[String(order.id)]} onChange={(e) => toggleSelectOrder(order.id, e.target.checked)} />
+                              <div>
+                                <p className="font-mono text-sm text-[#D4AF37] font-bold">{order.tracking_code}</p>
+                                <p className="font-medium text-black">{order.customer_name}</p>
+                                <p className="text-sm text-black/60">{order.phone}</p>
+                              </div>
                             </div>
                             <div className="text-right">
                               <p className="font-bold text-black">₦{order.total?.toLocaleString()}</p>
-                              <p className="text-xs text-black/50">{new Date(order.created_date).toLocaleDateString()}</p>
+                              <p className="text-xs text-black/50">{mounted ? new Date(order.created_date).toLocaleDateString() : ''}</p>
                             </div>
                           </div>
 
@@ -1244,7 +1427,10 @@ async function deleteInquiryRow(q: any) {
             <Card>
               <CardHeader className="flex flex-col sm:flex-row items-center gap-3 sm:justify-between">
                 <CardTitle>Catering Inquiries</CardTitle>
-                <Input className="w-full sm:w-64" placeholder="Search inquiries" value={inquirySearch} onChange={(e) => setInquirySearch(e.target.value)} />
+                <div className="flex w-full sm:w-auto items-center gap-2">
+                  <Input className="w-full sm:w-64" placeholder="Search inquiries" value={inquirySearch} onChange={(e) => setInquirySearch(e.target.value)} />
+                  <Button onClick={deleteSelectedInquiries} className="bg-red-600 hover:bg-red-700 text-white">Delete Selected</Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-3">
@@ -1260,10 +1446,13 @@ async function deleteInquiryRow(q: any) {
                       return fields.some((val: any) => String(val || '').toLowerCase().includes(s));
                     }).map((q) => (
                       <div key={q.id} className="p-4 bg-white rounded-xl border flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="font-medium text-black">{q.name}</p>
-                          <p className="text-sm text-black/60">{q.email} · {q.event_type || 'Event'} · {q.guests || '-'} guests</p>
-                          <p className="text-xs text-black/50">{q.created_at ? new Date(q.created_at).toLocaleString() : ''}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <input type="checkbox" checked={!!selectedInquiries[String(q.id)]} onChange={(e) => toggleSelectInquiry(q.id, e.target.checked)} />
+                          <div className="min-w-0">
+                            <p className="font-medium text-black">{q.name}</p>
+                            <p className="text-sm text-black/60">{q.email} · {q.event_type || 'Event'} · {q.guests || '-'} guests</p>
+                            <p className="text-xs text-black/50">{q.created_at ? (mounted ? new Date(q.created_at).toLocaleString() : '') : ''}</p>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button onClick={() => openViewInquiry(q)} className="p-2 rounded-lg hover:bg-gray-100"><Eye className="w-4 h-4" /></button>
@@ -1298,6 +1487,7 @@ async function deleteInquiryRow(q: any) {
                   }} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
                     <Send className="w-4 h-4 mr-2" /> Bulk Email
                   </Button>
+                  <Button onClick={deleteSelectedNewsletter} className="bg-red-600 hover:bg-red-700 text-white">Delete Selected</Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1312,9 +1502,12 @@ async function deleteInquiryRow(q: any) {
                       return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
                     }).map((s: any) => (
                       <div key={s.id || s.email} className="p-4 bg-white rounded-xl border flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="font-medium text-black">{s.email}</p>
-                          <p className="text-sm text-black/60">{s.name || '-'}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <input type="checkbox" checked={!!selectedNewsletter[String(s.id)]} onChange={(e) => toggleSelectNewsletter(s.id, e.target.checked)} />
+                          <div className="min-w-0">
+                            <p className="font-medium text-black">{s.email}</p>
+                            <p className="text-sm text-black/60">{s.name || '-'}</p>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button onClick={() => {
@@ -1440,6 +1633,7 @@ async function deleteInquiryRow(q: any) {
                   <Button onClick={() => setShowAddVoucher(true)} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">
                     <Plus className="w-4 h-4 mr-2" /> Add Voucher
                   </Button>
+                  <Button onClick={deleteSelectedVouchers} className="bg-red-600 hover:bg-red-700 text-white">Delete Selected</Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1500,6 +1694,7 @@ async function deleteInquiryRow(q: any) {
                     }).map((v) => (
                       <div key={v.id || v.code} className="p-4 bg-white rounded-xl border w-full sm:w-[22rem]">
                         <div className="flex items-center justify-between gap-4">
+                          <input type="checkbox" checked={!!selectedVouchers[String(v.id)]} onChange={(e) => toggleSelectVoucher(v.id, e.target.checked)} />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-black">{v.code}</p>
                             <p className="text-sm text-black/60">
@@ -1548,6 +1743,7 @@ async function deleteInquiryRow(q: any) {
                 <CardTitle>Product Management</CardTitle>
                 <div className="flex w-full sm:w-auto items-center gap-2">
                   <Input className="w-full sm:w-64" placeholder="Search products" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+                  <Button onClick={deleteSelectedProducts} className="bg-red-600 hover:bg-red-700 text-white">Delete Selected</Button>
                   <Button onClick={() => setShowAddProduct(true)} className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C4A030] text-white">
                     <Plus className="w-4 h-4 mr-2" /> Add Product
                   </Button>
@@ -1667,6 +1863,7 @@ async function deleteInquiryRow(q: any) {
                     return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
                   }).map((product) => (
                     <div key={product.id} className={cn('flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white rounded-xl border transition-opacity', !product.visible && 'opacity-50')}>
+                      <input type="checkbox" checked={!!selectedProducts[String(product.id)]} onChange={(e) => toggleSelectProduct(product.id, e.target.checked)} />
                       <img src={product.image} alt={product.name} className="w-16 h-16 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -1702,6 +1899,7 @@ async function deleteInquiryRow(q: any) {
                 <CardTitle>Blog Management</CardTitle>
                 <div className="flex w-full sm:w-auto items-center gap-2">
                   <Input className="w-full sm:w-64" placeholder="Search blog posts" value={blogSearch} onChange={(e) => setBlogSearch(e.target.value)} />
+                  <Button onClick={deleteSelectedBlogs} className="bg-red-600 hover:bg-red-700 text-white">Delete Selected</Button>
                   <Button onClick={() => setShowAddBlog(true)} className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#C4A030] text-white">
                     <Plus className="w-4 h-4 mr-2" /> Add Post
                   </Button>
@@ -1746,6 +1944,7 @@ async function deleteInquiryRow(q: any) {
                     return fields.some((val: any) => String(val || '').toLowerCase().includes(q));
                   }).map((post) => (
                     <div key={post.id} className={cn('flex items-center gap-4 p-4 bg-white rounded-xl border transition-opacity', !post.visible && 'opacity-50')}>
+                      <input type="checkbox" checked={!!selectedBlogs[String(post.id)]} onChange={(e) => toggleSelectBlog(post.id, e.target.checked)} />
                       <img src={post.image} alt={post.title} className="w-20 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-black truncate">{post.title}</h4>
@@ -1801,6 +2000,7 @@ async function deleteInquiryRow(q: any) {
                     </SelectContent>
                   </Select>
                   <Button onClick={addSelectedToNewsletter} className="bg-[#D4AF37] hover:bg-[#C4A030] text-white">Add to Newsletter</Button>
+                  <Button onClick={deleteSelectedContacts} className="bg-red-600 hover:bg-red-700 text-white">Delete Selected</Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1824,7 +2024,7 @@ async function deleteInquiryRow(q: any) {
                             <div className="min-w-0">
                               <p className="font-medium text-black">{c.name}</p>
                               <p className="text-sm text-black/60">{c.email}</p>
-                              <p className="text-xs text-black/50">{c.created_at ? new Date(c.created_at).toLocaleString() : ''}</p>
+                              <p className="text-xs text-black/50">{c.created_at ? (mounted ? new Date(c.created_at).toLocaleString() : '') : ''}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
