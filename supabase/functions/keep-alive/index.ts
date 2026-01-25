@@ -2,16 +2,17 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 Deno.serve(async (req) => {
   try {
-    // Only allow GET requests to strictly follow "read-only" intent, though not strictly enforced by RLS for the function itself
+    // Only allow GET requests
     if (req.method !== 'GET') {
       return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } })
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
 
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase Environment Variables')
+      console.error('Missing Supabase Environment Variables')
+      return new Response(JSON.stringify({ error: 'Configuration Error' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
@@ -20,12 +21,15 @@ Deno.serve(async (req) => {
     const { data, error } = await supabase
       .from('health_check')
       .select('last_checked_at')
-      .single()
+      .maybeSingle() // Use maybeSingle to avoid 406 if table is empty
 
     if (error) {
-      throw error
+      console.error('Supabase Query Error:', error)
+      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     }
 
+    // If no data exists yet, that's fine for a health check
+    
     return new Response(
       JSON.stringify({ 
         status: 'alive', 
@@ -38,6 +42,7 @@ Deno.serve(async (req) => {
       }
     )
   } catch (error) {
+    console.error('Unhandled Error:', error)
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { 
