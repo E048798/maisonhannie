@@ -1,0 +1,31 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    # Run at 00:00 UTC every 2 days
+    - cron: '0 0 */2 * *'
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Function
+        env:
+          SUPABASE_FUNCTION_URL: ${{ secrets.SUPABASE_FUNCTION_URL }}
+        run: |
+          if [ -z "$SUPABASE_FUNCTION_URL" ]; then
+            echo "Error: SUPABASE_FUNCTION_URL secret is not set"
+            echo "Please go to Settings > Secrets and variables > Actions in your repo and add SUPABASE_FUNCTION_URL"
+            exit 1
+          fi
+          
+          echo "Pinging Supabase function at configured URL..."
+          response=$(curl -s -w "%{http_code}" -o /dev/null "$SUPABASE_FUNCTION_URL")
+          
+          if [ "$response" -eq 200 ]; then
+            echo "Success: Supabase is alive (Status 200)"
+          else
+            echo "Error: Failed to ping Supabase (Status $response)"
+            exit 1
+          fi
